@@ -144,7 +144,7 @@ async def register_submit(
     if db.associate_number_exists(form["associate_number"]):
         return err("Ese número de asociado ya está registrado. Contacta al administrador si tienes problemas para entrar.")
 
-    # Crear usuario — contraseña elegida por él, no forzamos cambio
+    # Crear usuario — contraseña elegida por él, sin forzar cambio
     pwd_hash = auth.hash_password(password)
     user_id  = db.create_user(
         associate_number=form["associate_number"],
@@ -152,12 +152,10 @@ async def register_submit(
         password_hash=pwd_hash,
         role="user",
         tienda=form["tienda"],
+        must_change_password=0,
     )
-    # Limpiar flag must_change_password porque el usuario ya eligió su pwd
-    with db.get_conn() as conn:
-        conn.execute("UPDATE users SET must_change_password=0 WHERE id=?", (user_id,))
 
-    # Crear sesión y entrar directo — bienvenida sin fricción
+    # Crear sesión y entrar directo
     token = auth.create_session(user_id)
     resp  = RedirectResponse("/", status_code=302)
     resp.set_cookie(auth.COOKIE_NAME, token, httponly=True, samesite="lax", max_age=28800)
