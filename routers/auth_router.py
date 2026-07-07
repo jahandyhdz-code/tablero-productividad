@@ -142,7 +142,7 @@ async def register_submit(
     if password != confirm_password:
         return err("Las contraseñas no coinciden.")
     if db.associate_number_exists(form["associate_number"]):
-        return err("Ese número de asociado ya está registrado. Contacta al administrador si tienes problemas para entrar.")
+        return err("Ese número de asociado ya está registrado. Ve a Ingresar e introduce tu contraseña.")
 
     # Crear usuario — contraseña elegida por él, sin forzar cambio
     pwd_hash = auth.hash_password(password)
