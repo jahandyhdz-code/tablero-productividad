@@ -281,23 +281,27 @@ def _month_filter(col: str) -> str:
 # ────────────────────────────────────────────────────────────────────────────
 
 def create_user(associate_number: str, name: str, password_hash: str,
-                role: str = "user", tienda: str = "") -> int:
+                role: str = "user", tienda: str = "",
+                must_change_password: int = 1) -> int:
+    """must_change_password=1 para admin-creados, 0 para auto-registro."""
     with get_conn() as conn:
         if _USE_PG:
             cur = conn.cursor()
             cur.execute(
                 """INSERT INTO users
                    (associate_number, name, password_hash, role, tienda, must_change_password)
-                   VALUES (%s,%s,%s,%s,%s,1) RETURNING id""",
-                (associate_number.strip(), name.strip(), password_hash, role, tienda.strip()),
+                   VALUES (%s,%s,%s,%s,%s,%s) RETURNING id""",
+                (associate_number.strip(), name.strip(), password_hash, role,
+                 tienda.strip(), must_change_password),
             )
             return cur.fetchone()[0]
         else:
             cur = conn.execute(
                 """INSERT INTO users
                    (associate_number, name, password_hash, role, tienda, must_change_password)
-                   VALUES (?,?,?,?,?,1)""",
-                (associate_number.strip(), name.strip(), password_hash, role, tienda.strip()),
+                   VALUES (?,?,?,?,?,?)""",
+                (associate_number.strip(), name.strip(), password_hash, role,
+                 tienda.strip(), must_change_password),
             )
             return cur.lastrowid
 
