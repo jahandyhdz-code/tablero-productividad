@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+
+{% block title %}Bienvenido — Productividad de Ventas{% endblock %}
+
+{% block content %}
+<div class="min-h-[85vh] flex flex-col items-center justify-center py-10">
+
+  <!-- ─── Header / Branding ─────────────────────────────── -->
+  <div class="text-center mb-10">
+    <div class="inline-flex items-center justify-center w-20 h-20 bg-walmart rounded-full mb-5 shadow-lg">
+      <span class="text-spark font-black text-4xl leading-none" aria-hidden="true">*</span>
+    </div>
+    <h1 class="text-4xl font-black text-gray-800 tracking-tight">Bienvenido</h1>
+    <p class="text-gray-500 text-base mt-2">Sistema de Productividad de Ventas</p>
+    <p class="text-walmart font-semibold text-sm mt-0.5">Bodega Aurrera</p>
+  </div>
+
+  <!-- ─── Dos opciones principales ─────────────────────── -->
+  <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 w-full max-w-2xl px-4">
+
+    <!-- Tarjeta: Ingresar -->
+    <a
+      href="/login"
+      class="group flex flex-col items-center bg-white rounded-2xl shadow-md border-2 border-transparent
+             hover:border-walmart hover:shadow-lg focus:outline-none focus:ring-4 focus:ring-walmart/30
+             transition-all duration-200 p-8 text-center cursor-pointer"
+      aria-label="Ingresar con tu número de asociado"
+    >
+      <!-- Icono -->
+      <div class="flex items-center justify-center w-14 h-14 bg-walmart/10 rounded-full mb-4
+                  group-hover:bg-walmart/20 transition-colors">
+        <svg class="w-7 h-7 text-walmart" fill="none" stroke="currentColor" stroke-width="2"
+             viewBox="0 0 24 24" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round"
+                d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25
+                   2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M18 12H9m0 0l3-3m-3 3l3 3"/>
+        </svg>
+      </div>
+
+      <h2 class="text-xl font-bold text-gray-800 mb-1">Ingresar</h2>
+      <p class="text-gray-500 text-sm mb-6 leading-relaxed">
+        Ya tienes cuenta.<br/>Accede con tu número de asociado y contraseña.
+      </p>
+
+      <span class="mt-auto w-full bg-walmart hover:bg-walmart-dark text-white font-bold
+                   py-3 rounded-xl transition text-sm shadow-sm block text-center
+                   group-hover:bg-walmart-dark">
+        Entrar al sistema
+      </span>
+    </a>
+
+    <!-- Tarjeta: Registrarse -->
+    <a
+      href="/registro"
+      class="group flex flex-col items-center bg-white rounded-2xl shadow-md border-2 border-transparent
+             hover:border-walmart hover:shadow-lg focus:outline-none focus:ring-4 focus:ring-walmart/30
+             transition-all duration-200 p-8 text-center cursor-pointer"
+      aria-label="Crear una cuenta nueva"
+    >
+      <!-- Icono -->
+      <div class="flex items-center justify-center w-14 h-14 bg-spark/10 rounded-full mb-4
+                  group-hover:bg-spark/20 transition-colors">
+        <svg class="w-7 h-7 text-spark-dark" fill="none" stroke="currentColor" stroke-width="2"
+             viewBox="0 0 24 24" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round"
+                d="M18 7.5v3m0 0v3m0-3h3m-3 0h-3m-2.25-4.125a3.375 3.375 0 11-6.75 0
+                   3.375 3.375 0 016.75 0zM3 19.235v-.11a6.375 6.375 0 0112.75 0v.109A12.318
+                   12.318 0 019.374 21c-2.331 0-4.512-.645-6.374-1.766z"/>
+        </svg>
+      </div>
+
+      <h2 class="text-xl font-bold text-gray-800 mb-1">Registrarme</h2>
+      <p class="text-gray-500 text-sm mb-6 leading-relaxed">
+        Es tu primera vez.<br/>Crea tu cuenta en segundos con tu número de asociado.
+      </p>
+
+      <span class="mt-auto w-full border-2 border-walmart text-walmart font-bold
+                   py-3 rounded-xl transition text-sm block text-center
+                   group-hover:bg-walmart group-hover:text-white">
+        Crear mi cuenta
+      </span>
+    </a>
+
+  </div>
+
+  <!-- ─── Nota de administrador ─────────────────────────── -->
+  <div class="mt-10 max-w-md text-center px-4">
+    <div class="bg-gray-50 border border-gray-200 rounded-xl px-6 py-4">
+      <p class="text-xs text-gray-500 leading-relaxed">
+        <span class="font-semibold text-gray-600">¿Necesitas acceso de administrador?</span><br/>
+        Los administradores son dados de alta exclusivamente por el admin de tu área.
+        Contacta a tu supervisor para solicitar acceso.
+      </p>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
