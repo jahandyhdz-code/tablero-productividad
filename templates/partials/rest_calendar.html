@@ -1,0 +1,74 @@
+<!-- partials/rest_calendar.html — Calendario de dias de descanso (toggle via HTMX) -->
+<div id="rest-calendar" class="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+
+  <div class="flex items-center justify-between mb-3">
+    <h3 class="font-bold text-gray-700 text-sm uppercase tracking-wide">
+      Dias de descanso
+    </h3>
+    <span class="text-xs text-gray-400">
+      {{ metrics.rest_days | length }} dia(s) este mes
+    </span>
+  </div>
+
+  <p class="text-xs text-gray-500 mb-4">
+    Toca un dia para marcarlo como descanso. Esos dias
+    <strong>no se cuentan</strong> para calcular tu meta diaria ni semanal.
+  </p>
+
+  <!-- Cabecera dias de semana -->
+  <div class="grid grid-cols-7 gap-1 text-center text-[11px] font-bold text-gray-400 mb-1">
+    {% for d in ["Lu","Ma","Mi","Ju","Vi","Sa","Do"] %}
+    <div class="py-1">{{ d }}</div>
+    {% endfor %}
+  </div>
+
+  <!-- Grid del mes -->
+  <div class="grid grid-cols-7 gap-1 text-center text-xs">
+
+    {# Celdas vacias para alinear el primer dia al dia correcto de la semana #}
+    {% for _ in range(metrics.first_weekday) %}
+    <div></div>
+    {% endfor %}
+
+    {% for day_num in metrics.chart_labels %}
+      {% set iso = "%04d-%02d-%02d" | format(year, month, day_num) %}
+      {% set is_rest  = iso in metrics.rest_days %}
+      {% set is_today = iso == metrics.today %}
+
+      {% if is_rest %}
+        {% set cls = "bg-wmerror/15 text-wmerror border border-wmerror/40 font-bold" %}
+        {% set tip = "Descanso — clic para quitar" %}
+      {% elif is_today %}
+        {% set cls = "bg-spark text-walmart-dark border border-spark font-bold" %}
+        {% set tip = "Hoy — clic para marcar descanso" %}
+      {% else %}
+        {% set cls = "bg-gray-50 text-gray-600 border border-gray-200 hover:border-walmart hover:text-walmart" %}
+        {% set tip = "Clic para marcar descanso" %}
+      {% endif %}
+
+    <button
+      hx-post="/rest-days/{{ iso }}?year={{ year }}&month={{ month }}"
+      hx-target="#productivity-cards"
+      hx-swap="outerHTML"
+      title="{{ tip }}"
+      class="rounded-lg py-1.5 leading-tight transition {{ cls }}">
+      {{ day_num }}
+    </button>
+    {% endfor %}
+
+  </div>
+
+  <!-- Leyenda -->
+  <div class="mt-4 flex flex-wrap items-center gap-4 text-xs text-gray-500">
+    <span class="flex items-center gap-1.5">
+      <span class="inline-block w-3 h-3 rounded border border-spark bg-spark"></span> Hoy
+    </span>
+    <span class="flex items-center gap-1.5">
+      <span class="inline-block w-3 h-3 rounded border border-wmerror/40 bg-wmerror/15"></span> Descanso
+    </span>
+    <span class="flex items-center gap-1.5">
+      <span class="inline-block w-3 h-3 rounded border border-gray-200 bg-gray-50"></span> Dia normal
+    </span>
+  </div>
+
+</div>
