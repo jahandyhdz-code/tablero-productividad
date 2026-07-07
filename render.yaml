@@ -1,0 +1,24 @@
+# render.yaml — Blueprint para Render.com
+# Este archivo crea automaticamente el web service + base de datos PostgreSQL
+
+services:
+  - type: web
+    name: tablero-productividad-bodega
+    runtime: python
+    region: oregon
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: ventas-db
+          property: connectionString
+      - key: PYTHONUNBUFFERED
+        value: "1"
+    autoDeploy: true
+
+databases:
+  - name: ventas-db
+    databaseName: ventas
+    plan: free
