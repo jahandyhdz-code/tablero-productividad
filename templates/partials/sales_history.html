@@ -1,0 +1,50 @@
+<!-- partials/sales_history.html — Filas de la tabla, actualizado via HTMX OOB -->
+<tbody id="history-body">
+  {% if entries %}
+    {% for e in entries %}
+    <tr class="border-t border-gray-100 hover:bg-gray-50 group">
+      <td class="px-4 py-3 text-sm text-gray-600">{{ e.entry_date }}</td>
+
+      <!-- Gana+ -->
+      <td class="px-4 py-3 text-sm text-right">
+        {% if e.units_gana_plus and e.units_gana_plus > 0 %}
+          <span class="font-semibold text-gray-800">{{ e.units_gana_plus | int }}</span>
+        {% else %}
+          <span class="text-gray-300">—</span>
+        {% endif %}
+      </td>
+
+      <!-- Kiosko -->
+      <td class="px-4 py-3 text-sm text-right">
+        {% if e.units_kiosko and e.units_kiosko > 0 %}
+          <span class="font-semibold text-gray-800">{{ e.units_kiosko | int }}</span>
+        {% else %}
+          <span class="text-gray-300">—</span>
+        {% endif %}
+      </td>
+
+      <!-- Total -->
+      <td class="px-4 py-3 text-sm font-bold text-walmart text-right">
+        {{ e.units_sold | int }}
+      </td>
+
+      <td class="px-4 py-3 text-right">
+        <button
+          hx-delete="/sales/{{ e.id }}?year={{ year }}&month={{ month }}"
+          hx-target="#productivity-cards"
+          hx-swap="outerHTML"
+          hx-confirm="Borrar este registro?"
+          class="text-wmerror/60 hover:text-wmerror text-xs font-medium px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition">
+          Borrar
+        </button>
+      </td>
+    </tr>
+    {% endfor %}
+  {% else %}
+    <tr>
+      <td colspan="5" class="px-4 py-8 text-center text-sm text-gray-400 italic">
+        Sin registros este mes. Agrega tu primera venta arriba.
+      </td>
+    </tr>
+  {% endif %}
+</tbody>
