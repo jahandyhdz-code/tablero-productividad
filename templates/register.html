@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+
+{% block title %}Crear Cuenta — Productividad Ventas{% endblock %}
+
+{% block content %}
+<div class="min-h-[80vh] flex items-center justify-center py-8">
+  <div class="bg-white rounded-2xl shadow-lg w-full max-w-md p-8">
+
+    <!-- Header -->
+    <div class="text-center mb-7">
+      <div class="inline-flex items-center justify-center w-16 h-16 bg-walmart rounded-full mb-4 shadow">
+        <span class="text-spark font-black text-3xl leading-none">*</span>
+      </div>
+      <h1 class="text-2xl font-bold text-gray-800">Crear cuenta</h1>
+      <p class="text-gray-500 text-sm mt-1">Llena tus datos para registrarte</p>
+    </div>
+
+    <!-- Error banner -->
+    {% if error %}
+    <div class="bg-wmerror/10 border border-wmerror/30 text-wmerror rounded-lg px-4 py-3 text-sm mb-5">
+      {{ error }}
+    </div>
+    {% endif %}
+
+    <!-- Register form -->
+    <form action="/registro" method="post" class="space-y-4">
+
+      <div>
+        <label for="associate_number" class="block text-sm font-semibold text-gray-700 mb-1">
+          Número de asociado
+        </label>
+        <input
+          id="associate_number"
+          name="associate_number"
+          type="text"
+          inputmode="numeric"
+          required
+          maxlength="10"
+          placeholder="Ej. 123456"
+          value="{{ form.associate_number }}"
+          class="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-walmart focus:border-transparent transition"
+        />
+      </div>
+
+      <div>
+        <label for="name" class="block text-sm font-semibold text-gray-700 mb-1">
+          Nombre completo
+        </label>
+        <input
+          id="name"
+          name="name"
+          type="text"
+          required
+          maxlength="80"
+          placeholder="Ej. Juan Pérez García"
+          value="{{ form.name }}"
+          class="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-walmart focus:border-transparent transition"
+        />
+      </div>
+
+      <div>
+        <label for="tienda" class="block text-sm font-semibold text-gray-700 mb-1">
+          Tienda
+        </label>
+        <select
+          id="tienda"
+          name="tienda"
+          required
+          class="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-walmart focus:border-transparent transition bg-white"
+        >
+          <option value="" disabled {% if not form.tienda %}selected{% endif %}>Selecciona tu tienda…</option>
+          {% for t in tiendas %}
+          <option value="{{ t }}" {% if form.tienda == t %}selected{% endif %}>{{ t }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div>
+        <label for="password" class="block text-sm font-semibold text-gray-700 mb-1">
+          Contraseña
+        </label>
+        <input
+          id="password"
+          name="password"
+          type="password"
+          required
+          minlength="6"
+          autocomplete="new-password"
+          placeholder="Mínimo 6 caracteres"
+          class="w-full border border-gray-300 rounded-xl px-4 py.5 text-sm focus:outline-none focus:ring-2 focus:ring-walmart focus:border-transparent transition"
+        />
+      </div>
+
+      <div>
+        <label for="confirm_password" class="block text-sm font-semibold text-gray-700 mb-1">
+          Confirmar contraseña
+        </label>
+        <input
+          id="confirm_password"
+          name="confirm_password"
+          type="password"
+          required
+          minlength="6"
+          autocomplete="new-password"
+          placeholder="Repite tu contraseña"
+          class="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-walmart focus:border-transparent transition"
+        />
+      </div>
+
+      <button
+        type="submit"
+        class="w-full bg-walmart hover:bg-walmart-dark text-white font-bold py-3 rounded-xl transition text-sm shadow-sm mt-2"
+      >
+        Crear mi cuenta
+      </button>
+    </form>
+
+    <!-- Navegación secundaria -->
+    <div class="text-center mt-5 flex flex-col gap-3">
+      <a href="/login"
+         class="text-sm text-walmart font-semibold hover:underline focus:outline-none focus:ring-2 focus:ring-walmart rounded">
+        Ya tengo cuenta — Ingresar
+      </a>
+      <a href="/bienvenido"
+         class="text-sm text-gray-400 hover:text-gray-600 transition focus:outline-none focus:ring-2 focus:ring-gray-300 rounded">
+        ← Volver al inicio
+      </a>
+    </div>
+
+  </div>
+</div>
+{% endblock %}
