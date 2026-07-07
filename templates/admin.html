@@ -1,0 +1,389 @@
+{% extends "base.html" %}
+{% block title %}Admin — Productividad Ventas{% endblock %}
+
+{% block content %}
+
+<!-- Header + Period selector -->
+<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+  <div>
+    <h2 class="text-xl font-bold text-gray-800">Panel de Administrador</h2>
+    {% if is_super_admin %}
+    <p class="text-sm text-gray-500">Visión completa &mdash; todas las tiendas</p>
+    {% else %}
+    <p class="text-sm text-gray-500">Tus tiendas asignadas:</p>
+    <div class="flex flex-wrap gap-1 mt-1">
+      {% for t in admin_tiendas %}
+      <span class="inline-block bg-walmart/10 text-walmart text-xs font-semibold px-2 py-0.5 rounded-full">{{ t }}</span>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+  <form method="get" action="/admin" class="flex items-center gap-2">
+    <select name="month" class="text-sm border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-walmart">
+      {% for i in range(1, 13) %}
+      <option value="{{ i }}" {% if i == month %}selected{% endif %}>{{ months_es[i-1] }}</option>
+      {% endfor %}
+    </select>
+    <select name="year" class="text-sm border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-walmart">
+      {% for y in range(2024, 2028) %}
+      <option value="{{ y }}" {% if y == year %}selected{% endif %}>{{ y }}</option>
+      {% endfor %}
+    </select>
+    <button type="submit" class="bg-walmart text-white text-sm px-4 py-2 rounded-lg hover:bg-walmart-dark transition">
+      Ver
+    </button>
+    <a href="/admin/export/excel?year={{ year }}&month={{ month }}"
+       class="flex items-center gap-1.5 bg-wmgreen hover:bg-green-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition">
+      Exportar Excel
+    </a>
+  </form>
+</div>
+
+<!-- Alerts -->
+{% if msg %}
+<div class="bg-wmgreen/10 border border-wmgreen/30 text-wmgreen rounded-lg px-4 py-3 text-sm mb-5">
+  {{ msg }}
+</div>
+{% endif %}
+{% if error %}
+<div class="bg-wmerror/10 border border-wmerror/30 text-wmerror rounded-lg px-4 py-3 text-sm mb-5">
+  {{ error }}
+</div>
+{% endif %}
+
+<!-- TEAM PRODUCTIVITY TABLE -->
+<div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden mb-6">
+  <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+    <div>
+      <h3 class="font-bold text-gray-700 text-sm uppercase tracking-wide">
+        Productividad del Equipo &mdash; {{ months_es[month-1] }} {{ year }}
+      </h3>
+      <p class="text-xs text-gray-400 mt-0.5">
+        Semana comercial (Sáb&ndash;Vie): {{ wk_start }} al {{ wk_end }}
+        &nbsp;&middot;&nbsp; Meta de referencia: {{ daily_goal | int }} pedidos/día
+      </p>
+    </div>
+    <span class="text-xs text-gray-400">{{ team | length }} asociados</span>
+  </div>
+  <div class="overflow-x-auto">
+    <table class="w-full text-left">
+      <thead class="bg-gray-50 text-xs font-semibold text-gray-500 uppercase tracking-wide">
+        <tr>
+          <th class="px-4 py-3">Asociado</th>
+          <th class="px-4 py-3">Nombre</th>
+          <th class="px-4 py-3">Determinante</th>
+          <th class="px-4 py-3 text-right">Venta mes</th>
+          <th class="px-4 py-3 text-right">Meta en pedidos</th>
+          <th class="px-4 py-3 text-right">Hoy</th>
+          <th class="px-4 py-3 text-right">Dif. hoy</th>
+          <th class="px-4 py-3 text-center">Prod. semanal</th>
+          <th class="px-4 py-3">Progreso semanal</th>
+          <th class="px-4 py-3"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for member in team %}
+          {% set pp = member.prod_pct %}
+          {% if pp >= 100 %}
+            {% set bar   = "bg-wmgreen" %}
+            {% set badge = "bg-wmgreen/10 text-wmgreen" %}
+          {% elif pp >= 75 %}
+            {% set bar   = "bg-amber-400" %}
+            {% set badge = "bg-amber-50 text-amber-700" %}
+          {% elif pp >= 50 %}
+            {% set bar   = "bg-orange-400" %}
+            {% set badge = "bg-orange-50 text-orange-700" %}
+          {% else %}
+            {% set bar   = "bg-wmerror" %}
+            {% set badge = "bg-wmerror/10 text-wmerror" %}
+          {% endif %}
+
+          {% if member.diff_today > 0 %}
+            {% set diff_cls = "text-wmgreen font-semibold" %}
+            {% set diff_pre = "+" %}
+          {% elif member.diff_today < 0 %}
+            {% set diff_cls = "text-wmerror font-semibold" %}
+            {% set diff_pre = "" %}
+          {% else %}
+            {% set diff_cls = "text-gray-400" %}
+            {% set diff_pre = "" %}
+          {% endif %}
+
+        <tr class="border-t border-gray-100 hover:bg-gray-50">
+          <td class="px-4 py-3 text-sm font-mono text-gray-500">#{{ member.associate_number }}</td>
+          <td class="px-4 py-3 text-sm font-semibold text-gray-800">{{ member.name }}
+            {% if member.role == 'admin' %}
+            <span class="ml-1 text-xs bg-spark/20 text-spark-dark px-1.5 py-0.5 rounded">admin</span>
+            {% endif %}
+          </td>
+          <td class="px-4 py-3 text-xs text-gray-500">{{ member.tienda or '&mdash;' }}</td>
+          <td class="px-4 py-3 text-sm text-right font-semibold">{{ member.monthly_actual | int }}</td>
+          <td class="px-4 py-3 text-sm text-right text-gray-500">
+            {% if member.monthly_target > 0 %}{{ member.monthly_target | int }}{% else %}&mdash;{% endif %}
+          </td>
+          <td class="px-4 py-3 text-sm text-right">{{ member.today_actual | int }}</td>
+          <td class="px-4 py-3 text-sm text-right {{ diff_cls }}">
+            {% if member.daily_target > 0 %}
+              {{ diff_pre }}{{ member.diff_today | int }}
+            {% else %}&mdash;{% endif %}
+          </td>
+          <td class="px-4 py-3 text-center">
+            <span class="text-xs font-bold px-2.5 py-0.5 rounded-full {{ badge }}">
+              {{ member.weekly_productivity }} / {{ daily_goal | int }}
+            </span>
+          </td>
+          <td class="px-4 py-3 w-28">
+            <div class="bg-gray-100 rounded-full h-2">
+              <div class="{{ bar }} h-2 rounded-full" style="width: {{ [pp, 100] | min }}%"></div>
+            </div>
+          </td>
+          <td class="px-4 py-3">
+            {% if member.id != user.id %}
+            <form action="/admin/users/{{ member.id }}/delete" method="post"
+                  onsubmit="return confirm('\u00bfEliminar a {{ member.name }}?\n\nEsto borrar\u00e1 todos sus registros de ventas y datos. Esta acci\u00f3n no se puede deshacer.')">
+              <button type="submit"
+                class="flex items-center gap-1 text-xs text-wmerror hover:text-red-700
+                       hover:bg-wmerror/10 px-2 py-1 rounded-lg transition"
+                aria-label="Eliminar a {{ member.name }}">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2"
+                     viewBox="0 0 24 24" aria-hidden="true">
+                  <path stroke-linecap="round" stroke-linejoin="round"
+                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0
+                       01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0
+                       00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                </svg>
+                Borrar
+              </button>
+            </form>
+            {% else %}
+            <span class="text-xs text-gray-300 px-2">Tú</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- TOP 5 FELICITACIONES -->
+{% if top5 %}
+<div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden mb-6">
+  <div class="px-5 py-4 border-b border-gray-100" style="background: linear-gradient(135deg, #0071CE 0%, #004C99 100%);">
+    <h3 class="font-bold text-white text-sm uppercase tracking-wide">Felicitaciones &mdash; Top 5 de la semana</h3>
+    <p class="text-blue-200 text-xs mt-0.5">Mejores productividades semanal {{ wk_start }}&ndash;{{ wk_end }}</p>
+  </div>
+  <div class="p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+    {% set medals = ["1er Lugar", "2do Lugar", "3er Lugar", "4to Lugar", "5to Lugar"] %}
+    {% set medal_bg = ["from-yellow-50 border-yellow-300", "from-gray-50 border-gray-300",
+                       "from-orange-50 border-orange-300", "from-blue-50 border-blue-200",
+                       "from-blue-50 border-blue-200"] %}
+    {% set medal_text = ["text-yellow-700", "text-gray-600", "text-orange-700",
+                         "text-blue-700", "text-blue-700"] %}
+    {% set rank_bg = ["bg-yellow-400", "bg-gray-400", "bg-orange-400",
+                      "bg-walmart", "bg-walmart"] %}
+    {% for m in top5 %}
+      {% set idx = loop.index0 %}
+      <div class="rounded-xl border-2 bg-gradient-to-b {{ medal_bg[idx] }} to-white p-4 text-center flex flex-col items-center gap-2">
+        <span class="text-xs font-black px-3 py-1 rounded-full text-white {{ rank_bg[idx] }}">
+          {{ medals[idx] }}
+        </span>
+        <p class="font-bold text-gray-800 text-sm leading-tight mt-1">{{ m.name }}</p>
+        <p class="text-xs text-gray-500">{{ m.tienda or '&mdash;' }}</p>
+        <div class="mt-1">
+          <span class="text-2xl font-black {{ medal_text[idx] }}">{{ m.weekly_productivity }}</span>
+          <span class="text-xs text-gray-400 block">pedidos/día</span>
+        </div>
+        <p class="text-xs text-gray-400">{{ m.weekly_actual | int }} total esta semana</p>
+      </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<!-- MANAGEMENT FORMS — 3 columns -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+  <!-- Meta de EQUIPO (un valor para todos) -->
+  <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+    <h3 class="font-bold text-gray-700 mb-1 text-sm uppercase tracking-wide">Meta mensual del equipo</h3>
+    <p class="text-xs text-gray-400 mb-4">Se la misma meta a todos los asociados del equipo.</p>
+    <form action="/admin/team-target" method="post" class="space-y-3">
+      <div class="grid grid-cols-2 gap-2">
+        <div>
+          <label class="text-xs font-semibold text-gray-600 block mb-1">Mes</label>
+          <select name="month" class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-walmart focus:outline-none">
+            {% for i in range(1, 13) %}
+            <option value="{{ i }}" {% if i == month %}selected{% endif %}>{{ months_es[i-1] }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="text-xs font-semibold text-gray-600 block mb-1">Año</label>
+          <select name="year" class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-walmart focus:outline-none">
+            {% for y in range(2024, 2028) %}
+            <option value="{{ y }}" {% if y == year %}selected{% endif %}>{{ y }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <div>
+        <label class="text-xs font-semibold text-gray-600 block mb-1">Unidades meta (por asociado)</label>
+        <input type="number" name="target_units" min="1" step="1" required placeholder="Ej. 500"
+          class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-walmart focus:outline-none" />
+      </div>
+      <button type="submit" class="w-full bg-walmart hover:bg-walmart-dark text-white font-bold py-2.5 rounded-xl transition text-sm">
+        Aplicar a todo el equipo
+      </button>
+    </form>
+  </div>
+
+  <!-- Crear usuario -->
+  <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+    <h3 class="font-bold text-gray-700 mb-4 text-sm uppercase tracking-wide">Agregar usuario</h3>
+    <form action="/admin/users" method="post" class="space-y-3">
+      <div>
+        <label class="text-xs font-semibold text-gray-600 block mb-1">No. Asociado</label>
+        <input type="text" name="associate_number" required placeholder="Ej. 789012"
+          class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-walmart focus:outline-none" />
+      </div>
+      <div>
+        <label class="text-xs font-semibold text-gray-600 block mb-1">Nombre completo</label>
+        <input type="text" name="name" required placeholder="Ej. Ana Garcia"
+          class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-walmart focus:outline-none" />
+      </div>
+      <div>
+        <label class="text-xs font-semibold text-gray-600 block mb-1">Contrasena inicial</label>
+        <input type="password" name="password" required placeholder="Min. 6 caracteres"
+          class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-walmart focus:outline-none" />
+      </div>
+      <div>
+        <label class="text-xs font-semibold text-gray-600 block mb-1">Rol</label>
+        <select name="role" id="role-select"
+          class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-walmart focus:outline-none"
+          onchange="toggleAdminTiendas(this.value)">
+          <option value="user">Usuario</option>
+          <option value="admin">Administrador</option>
+        </select>
+      </div>
+
+      <!-- Panel de tiendas: solo visible cuando rol = admin -->
+      <div id="admin-tiendas-panel" class="hidden">
+        <label class="text-xs font-semibold text-gray-600 block mb-1">
+          Tiendas visibles para este admin
+          <span class="text-gray-400 font-normal">(selecciona una o más)</span>
+        </label>
+        <!-- Buscador -->
+        <input
+          type="text"
+          id="tienda-search"
+          placeholder="Buscar tienda..."
+          oninput="filtrarTiendas(this.value)"
+          class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm mb-2
+                 focus:ring-2 focus:ring-walmart focus:outline-none"
+        />
+        <!-- Lista de checkboxes -->
+        <div id="tienda-list"
+             class="border border-gray-200 rounded-xl overflow-y-auto max-h-52 bg-gray-50 px-2 py-1">
+          {% for t in todas_las_tiendas %}
+          <label class="tienda-item flex items-center gap-2 px-2 py-1.5 rounded-lg
+                        hover:bg-walmart/5 cursor-pointer text-sm"
+                 data-name="{{ t | lower }}">
+            <input type="checkbox" name="admin_tiendas" value="{{ t }}"
+                   class="rounded text-walmart focus:ring-walmart accent-walmart" />
+            <span class="text-gray-700">{{ t }}</span>
+          </label>
+          {% endfor %}
+        </div>
+        <div class="flex gap-2 mt-1.5">
+          <button type="button" onclick="toggleAllTiendas(true)"
+            class="text-xs text-walmart hover:underline">Todas</button>
+          <span class="text-gray-300">|</span>
+          <button type="button" onclick="toggleAllTiendas(false)"
+            class="text-xs text-gray-400 hover:underline">Ninguna</button>
+          <span id="tiendas-count" class="ml-auto text-xs text-gray-400"></span>
+        </div>
+      </div>
+
+      <p class="text-xs text-gray-400 italic">El asociado deberá cambiar su contraseña en el primer ingreso.</p>
+      <button type="submit" class="w-full bg-walmart hover:bg-walmart-dark text-white font-bold py-2.5 rounded-xl transition text-sm">
+        Crear usuario
+      </button>
+    </form>
+  </div>
+
+  <!-- Reset password -->
+  <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+    <h3 class="font-bold text-gray-700 mb-4 text-sm uppercase tracking-wide">Restablecer contrasena</h3>
+    <form action="/admin/reset-password" method="post" class="space-y-3">
+      <div>
+        <label class="text-xs font-semibold text-gray-600 block mb-1">Asociado</label>
+        <select name="user_id" required class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-walmart focus:outline-none">
+          {% for u in all_users %}
+          <option value="{{ u.id }}">{{ u.name }} (#{{ u.associate_number }})</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="text-xs font-semibold text-gray-600 block mb-1">Nueva contrasena</label>
+        <input type="password" name="new_password" required placeholder="Min. 6 caracteres"
+          class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-walmart focus:outline-none" />
+      </div>
+      <p class="text-xs text-gray-400 italic">
+        Solo cambia la contrasena; el asociado no puede cambiar la de otro.
+      </p>
+      <button type="submit"
+        class="w-full bg-wmerror hover:bg-red-700 text-white font-bold py-2.5 rounded-xl transition text-sm">
+        Restablecer
+      </button>
+    </form>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// ── Toggle panel de tiendas al cambiar el rol ─────────────────────────────────
+function toggleAdminTiendas(role) {
+  const panel = document.getElementById('admin-tiendas-panel');
+  if (role === 'admin') {
+    panel.classList.remove('hidden');
+    actualizarConteo();
+  } else {
+    panel.classList.add('hidden');
+    // Des-seleccionar todo al cambiar a usuario
+    document.querySelectorAll('#tienda-list input[type=checkbox]')
+            .forEach(cb => cb.checked = false);
+    actualizarConteo();
+  }
+}
+
+// ── Filtrar tiendas con el buscador ───────────────────────────────────────
+function filtrarTiendas(q) {
+  const term = q.toLowerCase().trim();
+  document.querySelectorAll('#tienda-list .tienda-item').forEach(item => {
+    item.style.display = item.dataset.name.includes(term) ? '' : 'none';
+  });
+}
+
+// ── Seleccionar / limpiar todas ─────────────────────────────────────────────
+function toggleAllTiendas(state) {
+  document.querySelectorAll('#tienda-list input[type=checkbox]')
+          .forEach(cb => cb.checked = state);
+  actualizarConteo();
+}
+
+// ── Contador en tiempo real ───────────────────────────────────────────────────
+function actualizarConteo() {
+  const n = document.querySelectorAll('#tienda-list input[type=checkbox]:checked').length;
+  const el = document.getElementById('tiendas-count');
+  if (el) el.textContent = n > 0 ? n + ' seleccionadas' : '';
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('#tienda-list input[type=checkbox]')
+          .forEach(cb => cb.addEventListener('change', actualizarConteo));
+});
+</script>
+{% endblock %}
