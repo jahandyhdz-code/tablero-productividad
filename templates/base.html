@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" href="/static/favicon.ico" />
+  <title>{% block title %}Productividad de Ventas{% endblock %}</title>
+  <script src="/static/tailwind.cdn.js"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            walmart: { DEFAULT: '#00ad30', dark: '#007a22', light: '#e6f7ea' },
+            spark:   { DEFAULT: '#ffc220', dark: '#995213' },
+            wmgreen: { DEFAULT: '#007a22', light: '#e6f7ea' },
+            wmerror: { DEFAULT: '#ea1100', light: '#fde8e8' },
+          }
+        }
+      }
+    }
+  </script>
+  <script src="/static/htmx.min.js"></script>
+  {% block head %}{% endblock %}
+</head>
+<body class="bg-gray-50 min-h-screen text-gray-800">
+
+  <!-- NAVBAR -->
+  {% if user is defined and user %}
+  <header class="bg-walmart shadow-md">
+    <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <span class="text-spark font-black text-2xl leading-none">*</span>
+        <span class="text-white font-bold text-lg">Productividad Ventas</span>
+        {% if user.role == 'admin' %}
+        <span class="bg-spark text-walmart-dark text-xs font-bold px-2 py-0.5 rounded-full">ADMIN</span>
+        {% endif %}
+      </div>
+      <div class="flex items-center gap-4">
+        <span class="text-white/80 text-sm hidden sm:block">{{ user.name }} &middot; #{{ user.associate_number }}</span>
+        <form action="/logout" method="post">
+          <button type="submit"
+            class="text-sm bg-white/10 hover:bg-white/20 text-white border border-white/30 px-3 py-1 rounded-lg transition">
+            Cerrar sesion
+          </button>
+        </form>
+      </div>
+    </div>
+  </header>
+  {% endif %}
+
+  <main class="max-w-6xl mx-auto px-4 py-6">
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="text-center text-xs text-gray-400 py-6 mt-8">
+    Bodega Aurrera &mdash; Sistema de Productividad de Ventas
+  </footer>
+
+  {% block scripts %}{% endblock %}
+</body>
+</html>
