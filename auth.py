@@ -70,5 +70,5 @@ def seed_admin_if_empty():
         )
         # El admin inicial conoce su contrasena; no forzamos cambio
         with db.get_conn() as conn:
-            conn.execute("UPDATE users SET must_change_password=0 WHERE id=?", (uid,))
+            db._exec(conn, "UPDATE users SET must_change_password=0 WHERE id=?", (uid,))
         print(" Admin creado — asociado: 000000 | contrasena: Admin2024!")
