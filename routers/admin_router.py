@@ -318,16 +318,9 @@ async def reset_password(
     if not _admin_user(request):
         return RedirectResponse("/login", status_code=302)
 
-    # Al resetear, se vuelve a marcar must_change_password para que el asociado
-    # elija su contraseña la próxima vez que entre.
-    db.update_user_password(user_id, auth.hash_password(new_password), clear_force=False)
-    # Reactiva el flag manualmente
-    import database as _db
-    with _db.get_conn() as conn:
-        conn.execute(
-            "UPDATE users SET must_change_password=1 WHERE id=?", (user_id,)
-        )
-    return RedirectResponse("/admin?msg=Contraseña+restablecida+—+el+asociado+deberá+cambiarla", status_code=302)
+    # Actualiza la contrasena directamente — el asociado entra sin friccion
+    db.update_user_password(user_id, auth.hash_password(new_password), clear_force=True)
+    return RedirectResponse("/admin?msg=Contrasena+restablecida+correctamente", status_code=302)
 
 
 @router.get("/export/excel")
