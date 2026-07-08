@@ -215,7 +215,7 @@ async def admin_dashboard(request: Request):
     # Tiendas visibles para este admin (para el picker de crear usuario)
     tiendas_disp = tf if tf else db.DETERMINANTES
 
-    top5 = [m for m in team if m["weekly_productivity"] > 0][:5]
+    top5 = [m for m in team if m["prod_mensual"] > 0][:5]
 
     return templates.TemplateResponse("admin.html", {
         "request":          request,
