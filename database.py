@@ -623,9 +623,15 @@ def get_productivity_metrics(user_id: int, year: int, month: int) -> dict:
 
 def get_team_productivity(year: int, month: int,
                           tiendas_filter: list | None = None) -> list[dict]:
-    today = date.today()
-    wk_start, wk_end = commercial_week(today)
-    days_in_month    = calendar.monthrange(year, month)[1]
+    today      = date.today()
+    first_day  = date(year, month, 1)
+    days_in_month = calendar.monthrange(year, month)[1]
+
+    # Ultimo dia considerado: hoy si es el mes en curso, o fin de mes si es pasado
+    if year == today.year and month == today.month:
+        last_elapsed = today
+    else:
+        last_elapsed = date(year, month, days_in_month)
 
     result = []
     for u in get_all_users(tiendas_filter=tiendas_filter):
@@ -633,52 +639,45 @@ def get_team_productivity(year: int, month: int,
         entries        = get_sales_for_month(u["id"], year, month)
         monthly_actual = sum(e["units_sold"] for e in entries)
 
-        rest_set     = get_rest_days_for_month(u["id"], year, month)
-        working_days = max(days_in_month - len(rest_set), 1)
-        daily_from_month = monthly_target / working_days if monthly_target else 0.0
+        rest_set = get_rest_days_for_month(u["id"], year, month)
+
+        # Dias laborados = dias transcurridos - descansos en ese periodo
+        elapsed_days    = (last_elapsed - first_day).days + 1
+        rest_in_elapsed = sum(1 for d in rest_set if d <= last_elapsed.isoformat())
+        dias_laborados  = max(elapsed_days - rest_in_elapsed, 1)
+
+        # Nueva formula de productividad
+        prod_mensual    = round(monthly_actual / dias_laborados, 1)
+        daily_from_month = monthly_target / max(days_in_month - len(rest_set), 1) if monthly_target else 0.0
 
         today_actual = get_sales_for_day(u["id"], today)
-        diff_today   = round(today_actual - daily_from_month, 1)
 
-        weekly_actual = get_sales_for_week(u["id"], wk_start, wk_end)
-        with get_conn() as conn:
-            cur = _exec(conn,
-                        """SELECT COUNT(DISTINCT entry_date) as cnt FROM sales_entries
-                           WHERE user_id=? AND entry_date>=? AND entry_date<=?""",
-                        (u["id"], wk_start.isoformat(), wk_end.isoformat()))
-            row = _fetchone(cur)
-        days_worked  = max(int(row["cnt"]) if row else 1, 1)
-        weekly_prod  = round(weekly_actual / days_worked, 1)
-        prod_pct     = _pct(weekly_prod, DAILY_GOAL)
-
-        # Desglose diario de la semana comercial (Sab-Vie)
-        week_days = []
-        for i in range(7):
-            d = wk_start + timedelta(days=i)
+        # Desglose dia a dia de todo el mes (hasta hoy si es el mes en curso)
+        month_days = []
+        for i in range((last_elapsed - first_day).days + 1):
+            d = first_day + timedelta(days=i)
             day_sales = get_sales_for_day(u["id"], d)
-            week_days.append({
-                "date": d.isoformat(),
-                "label": ["Lun","Mar","Mie","Jue","Vie","Sab","Dom"][d.weekday()],
-                "units": day_sales,
+            month_days.append({
+                "date":     d.isoformat(),
+                "label":    ["Lun","Mar","Mie","Jue","Vie","Sab","Dom"][d.weekday()],
+                "day":      d.day,
+                "units":    day_sales,
                 "is_today": d == today,
-                "is_rest": d.isoformat() in rest_set,
+                "is_rest":  d.isoformat() in rest_set,
             })
 
         result.append({
             **u,
-            "monthly_target":      monthly_target,
-            "monthly_actual":      monthly_actual,
-            "monthly_pct":         _pct(monthly_actual, monthly_target),
-            "weekly_actual":       weekly_actual,
-            "weekly_productivity": weekly_prod,
-            "prod_pct":            prod_pct,
-            "today_actual":        today_actual,
-            "diff_today":          diff_today,
-            "daily_target":        round(daily_from_month, 1),
-            "week_days":           week_days,
+            "monthly_target":   monthly_target,
+            "monthly_actual":   monthly_actual,
+            "dias_laborados":   dias_laborados,
+            "prod_mensual":     prod_mensual,
+            "today_actual":     today_actual,
+            "daily_target":     round(daily_from_month, 1),
+            "month_days":       month_days,
         })
 
-    return sorted(result, key=lambda x: x["weekly_productivity"], reverse=True)
+    return sorted(result, key=lambda x: x["prod_mensual"], reverse=True)
 
 
 def get_all_entries_for_month(year: int, month: int,
