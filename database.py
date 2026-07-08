@@ -651,6 +651,19 @@ def get_team_productivity(year: int, month: int,
         weekly_prod  = round(weekly_actual / days_worked, 1)
         prod_pct     = _pct(weekly_prod, DAILY_GOAL)
 
+        # Desglose diario de la semana comercial (Sab-Vie)
+        week_days = []
+        for i in range(7):
+            d = wk_start + timedelta(days=i)
+            day_sales = get_sales_for_day(u["id"], d)
+            week_days.append({
+                "date": d.isoformat(),
+                "label": ["Lun","Mar","Mie","Jue","Vie","Sab","Dom"][d.weekday()],
+                "units": day_sales,
+                "is_today": d == today,
+                "is_rest": d.isoformat() in rest_set,
+            })
+
         result.append({
             **u,
             "monthly_target":      monthly_target,
@@ -662,6 +675,7 @@ def get_team_productivity(year: int, month: int,
             "today_actual":        today_actual,
             "diff_today":          diff_today,
             "daily_target":        round(daily_from_month, 1),
+            "week_days":           week_days,
         })
 
     return sorted(result, key=lambda x: x["weekly_productivity"], reverse=True)
