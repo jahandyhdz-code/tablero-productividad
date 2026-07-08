@@ -78,6 +78,7 @@
           <th class="px-4 py-3 text-right">Dif. hoy</th>
           <th class="px-4 py-3 text-center">Prod. semanal</th>
           <th class="px-4 py-3">Progreso semanal</th>
+          <th class="px-4 py-3 text-center">Dias</th>
           <th class="px-4 py-3"></th>
         </tr>
       </thead>
@@ -137,6 +138,12 @@
               <div class="{{ bar }} h-2 rounded-full" style="width: {{ [pp, 100] | min }}%"></div>
             </div>
           </td>
+          <td class="px-4 py-3 text-center">
+            <button onclick="toggleDias({{ member.id }}, this)"
+              class="text-xs text-walmart hover:text-walmart-dark font-semibold px-2 py-1 rounded-lg hover:bg-walmart/10 transition">
+              Ver
+            </button>
+          </td>
           <td class="px-4 py-3">
             {% if member.id != user.id %}
             <form action="/admin/users/{{ member.id }}/delete" method="post"
@@ -156,8 +163,39 @@
               </button>
             </form>
             {% else %}
-            <span class="text-xs text-gray-300 px-2">Tú</span>
+            <span class="text-xs text-gray-300 px-2">Tu</span>
             {% endif %}
+          </td>
+        </tr>
+        <!-- Fila de pedidos por dia (semana comercial) -->
+        <tr id="dias-{{ member.id }}" class="hidden bg-gray-50 border-t border-gray-100">
+          <td colspan="10" class="px-6 py-3">
+            <div class="flex items-center gap-1 flex-wrap">
+              <span class="text-xs text-gray-400 font-semibold mr-2 uppercase tracking-wide">Semana:</span>
+              {% for d in member.week_days %}
+                {% if d.is_rest %}
+                  <div class="flex flex-col items-center px-3 py-1.5 rounded-lg bg-gray-100 opacity-50">
+                    <span class="text-xs text-gray-400 font-semibold">{{ d.label }}</span>
+                    <span class="text-xs text-gray-400">desc</span>
+                  </div>
+                {% elif d.is_today %}
+                  <div class="flex flex-col items-center px-3 py-1.5 rounded-lg bg-walmart/10 border border-walmart">
+                    <span class="text-xs text-walmart font-bold">{{ d.label }}</span>
+                    <span class="text-sm font-bold text-walmart">{{ d.units | int }}</span>
+                  </div>
+                {% elif d.units > 0 %}
+                  <div class="flex flex-col items-center px-3 py-1.5 rounded-lg bg-wmgreen/10">
+                    <span class="text-xs text-gray-500 font-semibold">{{ d.label }}</span>
+                    <span class="text-sm font-bold text-wmgreen">{{ d.units | int }}</span>
+                  </div>
+                {% else %}
+                  <div class="flex flex-col items-center px-3 py-1.5 rounded-lg bg-white border border-gray-200">
+                    <span class="text-xs text-gray-400 font-semibold">{{ d.label }}</span>
+                    <span class="text-sm text-gray-300">&mdash;</span>
+                  </div>
+                {% endif %}
+              {% endfor %}
+            </div>
           </td>
         </tr>
         {% endfor %}
@@ -344,7 +382,14 @@
 
 {% block scripts %}
 <script>
-// ── Toggle panel de tiendas al cambiar el rol ─────────────────────────────────
+// ── Toggle pedidos por dia ────────────────────────────────────────────────────
+function toggleDias(memberId, btn) {
+  const fila = document.getElementById('dias-' + memberId);
+  const oculto = fila.classList.contains('hidden');
+  fila.classList.toggle('hidden');
+  btn.textContent = oculto ? 'Ocultar' : 'Ver';
+}
+
 function toggleAdminTiendas(role) {
   const panel = document.getElementById('admin-tiendas-panel');
   if (role === 'admin') {
