@@ -1,9 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Mi Dashboard — Productividad Ventas{% endblock %}
 
-{% block head %}
-<script src="/static/chart.min.js"></script>
-{% endblock %}
+{% block head %}{% endblock %}
 
 {% block content %}
 
@@ -32,36 +30,57 @@
   </form>
 </div>
 
+
+
+<!-- ── PANEL: MI PRODUCTIVIDAD ──────────────────────────────────────────── -->
+<div id="panel-prod">
+
 <!-- PRODUCTIVITY CARDS (target HTMX) -->
 {% include "partials/productivity_cards.html" %}
 
-<!-- CHART + ADD SALE + DESCANSOS — grid 3 col -->
-<div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
+<!-- ADD SALE + META -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
 
-  <!-- Grafica (2/3) -->
-  <div class="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
-    <h3 class="font-bold text-gray-700 mb-4 text-sm uppercase tracking-wide">
-      Ventas diarias — {{ months_es[month-1] }} {{ year }}
-    </h3>
-    <div style="height:220px; position:relative;">
-      <canvas id="salesChart"></canvas>
-    </div>
-  </div>
-
-  <!-- Agregar venta (1/3) -->
+  <!-- Agregar pedido -->
   <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
     <h3 class="font-bold text-gray-700 mb-4 text-sm uppercase tracking-wide">
-      Agregar venta
+      Agregar pedido
     </h3>
     <form
       hx-post="/sales"
       hx-target="#productivity-cards"
       hx-swap="outerHTML"
-      hx-on::after-request="this.reset(); actualizarTotal();"
+      hx-on::after-request="if(!window._saleError) { this.reset(); detectarTipo(''); }"
       class="space-y-4"
     >
       <input type="hidden" name="year"  value="{{ year }}" />
       <input type="hidden" name="month" value="{{ month }}" />
+      <!-- Tipo se manda oculto, calculado por JS -->
+      <input type="hidden" id="gana_plus" name="gana_plus" value="0" />
+      <input type="hidden" id="kiosko"    name="kiosko"    value="0" />
+
+      <!-- Numero de pedido -->
+      <div>
+        <label class="text-xs font-semibold text-gray-600 block mb-1">
+          Numero de pedido
+          <span class="text-gray-400 font-normal">(13 = Gana+&nbsp;&nbsp;15 = Kiosko)</span>
+        </label>
+        <input
+          id="order_number" name="order_number"
+          type="text" inputmode="numeric" maxlength="15"
+          placeholder="Ej. 1234567890123"
+          oninput="validarPedido(this)"
+          class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm font-mono
+                 focus:ring-2 focus:ring-walmart focus:outline-none tracking-wide" />
+        <p id="order-local-error" class="text-red-500 text-[10px] mt-1 hidden"></p>
+      </div>
+
+      <!-- Error del servidor (duplicado, etc) -->
+      <div id="sale-error"></div>
+
+      <!-- Tipo detectado automaticamente -->
+      <div id="tipo-badge" class="hidden rounded-xl px-4 py-3 text-center font-bold text-sm">
+      </div>
 
       <div>
         <label class="text-xs font-semibold text-gray-600 block mb-1">Fecha</label>
@@ -69,38 +88,56 @@
           class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-walmart focus:outline-none" />
       </div>
 
-      <!-- Ventas Gana+ -->
       <div>
-        <label class="text-xs font-semibold text-gray-600 block mb-1">Ventas Gana+</label>
-        <input
-          id="gana_plus" name="gana_plus"
-          type="number" min="0" step="1" placeholder="0"
-          oninput="actualizarTotal()"
-          class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-spark focus:outline-none" />
+        <label class="text-xs font-semibold text-gray-600 block mb-1">
+          Monto del pedido
+          <span class="text-gray-400 font-normal">(con IVA)</span>
+        </label>
+        <div class="relative">
+          <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
+          <input
+            id="amount_pesos" name="amount_pesos"
+            type="number" min="0" step="0.01" placeholder="0.00"
+            oninput="previsualizarMonto(this.value)"
+            class="w-full border border-gray-300 rounded-xl pl-7 pr-3 py-2 text-sm
+                   focus:ring-2 focus:ring-walmart focus:outline-none" />
+        </div>
+        <p id="monto-preview" class="text-[10px] text-gray-400 mt-1"></p>
       </div>
 
-      <!-- Ventas Kiosko -->
+      <!-- Almacen -->
       <div>
-        <label class="text-xs font-semibold text-gray-600 block mb-1">Ventas Kiosko</label>
-        <input
-          id="kiosko" name="kiosko"
-          type="number" min="0" step="1" placeholder="0"
-          oninput="actualizarTotal()"
-          class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-spark focus:outline-none" />
+        <label class="text-xs font-semibold text-gray-600 block mb-1">Almacén</label>
+        <select name="almacen"
+          class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm
+                 focus:ring-2 focus:ring-walmart focus:outline-none bg-white">
+          <option value="">— Seleccionar —</option>
+          <option value="1P">1P</option>
+          <option value="WFS">WFS</option>
+          <option value="MKP">MKP</option>
+        </select>
       </div>
 
-      <!-- Total auto-calculado -->
-      <div class="bg-walmart/5 border border-walmart/20 rounded-xl px-4 py-3 flex items-center justify-between">
-        <span class="text-xs font-semibold text-gray-600">Total pedidos</span>
-        <span id="total-display" class="text-2xl font-black text-walmart">0</span>
+      <!-- Descripcion de los articulos -->
+      <div>
+        <label class="text-xs font-semibold text-gray-600 block mb-1">Descripción de artículos</label>
+        <textarea name="descripcion" rows="2" placeholder="Ej. TV Samsung 55', auriculares..."
+          class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm
+                 focus:ring-2 focus:ring-walmart focus:outline-none resize-none"></textarea>
       </div>
 
       <button type="submit"
-        class="w-full bg-walmart hover:bg-walmart-dark text-white font-bold py-2.5 rounded-xl transition text-sm shadow-sm">
-        Registrar
+        id="submit-btn" disabled
+        class="w-full bg-gray-200 text-gray-400 font-bold py-2.5 rounded-xl text-sm
+               transition disabled:cursor-not-allowed
+               enabled:bg-walmart enabled:hover:bg-walmart-dark enabled:text-white enabled:shadow-sm">
+        Registrar pedido
       </button>
     </form>
   </div>
+
+  <!-- Presupuesto mensual + plantilla -->
+  {% include "partials/meta_panel.html" %}
 
 </div>
 
@@ -110,25 +147,13 @@
 </div>
 
 <!-- HISTORIAL -->
-<div class="mt-6 bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-  <div class="px-5 py-4 border-b border-gray-100">
-    <h3 class="font-bold text-gray-700 text-sm uppercase tracking-wide">
-      Historial — {{ months_es[month-1] }} {{ year }}
-    </h3>
-  </div>
-  <div class="overflow-x-auto">
-    <table class="w-full text-left">
-      <thead class="bg-gray-50 text-xs font-semibold text-gray-500 uppercase tracking-wide">
-        <tr>
-          <th class="px-4 py-3">Fecha</th>
-          <th class="px-4 py-3 text-right">Gana+</th>
-          <th class="px-4 py-3 text-right">Kiosko</th>
-          <th class="px-4 py-3 text-right">Total</th>
-          <th class="px-4 py-3"></th>
-        </tr>
-      </thead>
-      {% include "partials/sales_history.html" %}
-    </table>
+
+</div><!-- /panel-prod -->
+
+<!-- ── PANEL: CONCENTRADO DE VENTAS ──────────────────────────────────── -->
+<div id="panel-conc" class="hidden mt-6">
+  <div class="text-center py-16 text-gray-400">
+    <p class="text-sm">Haz clic en la pestana para cargar.</p>
   </div>
 </div>
 
@@ -136,47 +161,89 @@
 
 {% block scripts %}
 <script>
-  // ── Auto-suma Gana+ + Kiosko ───────────────────────────
-  function actualizarTotal() {
-    const gana   = parseFloat(document.getElementById('gana_plus')?.value) || 0;
-    const kiosko = parseFloat(document.getElementById('kiosko')?.value)    || 0;
-    const total  = gana + kiosko;
-    const el = document.getElementById('total-display');
-    if (el) el.textContent = total;
-  }
-  const labels   = {{ metrics.chart_labels | tojson }};
-  const data     = {{ metrics.chart_data   | tojson }};
-  const restDays = {{ metrics.chart_rest   | tojson }};
-  const todayDay = new Date().getDate();
+  // ── Deteccion automatica de tipo por longitud ──────────────────
+  function detectarTipo(val) {
+    const ganaInput   = document.getElementById('gana_plus');
+    const kioskoInput = document.getElementById('kiosko');
+    const badge       = document.getElementById('tipo-badge');
+    const btn         = document.getElementById('submit-btn');
 
-  new Chart(document.getElementById('salesChart'), {
-    type: 'bar',
-    data: {
-      labels: labels.map(d => 'D' + d),
-      datasets: [{
-        label: 'Unidades vendidas',
-        data: data,
-        backgroundColor: labels.map((d, i) =>
-          restDays[i]  ? '#fca5a5' :   /* dia descanso: rojo claro */
-          d === todayDay ? '#ffc220' :  /* hoy: spark/amarillo */
-          '#00ad30'                      /* normal: verde Bodega */
-        ),
-        borderRadius: 4,
-        borderSkipped: false,
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        legend: { display: false },
-        tooltip: { callbacks: { label: ctx => ctx.raw + ' uds' } }
-      },
-      scales: {
-        y: { beginAtZero: true, ticks: { precision: 0 } },
-        x: { grid: { display: false } }
-      }
+    ganaInput.value   = '0';
+    kioskoInput.value = '0';
+    badge.className   = 'hidden rounded-xl px-4 py-3 text-center font-bold text-sm';
+    badge.textContent = '';
+    btn.disabled      = true;
+
+    if (val.length === 13) {
+      ganaInput.value = '1';
+      badge.textContent = 'GANA+ detectado';
+      badge.className = 'rounded-xl px-4 py-3 text-center font-bold text-sm bg-spark/10 text-spark-dark border border-spark/30';
+      btn.disabled = false;
+    } else if (val.length === 15) {
+      kioskoInput.value = '1';
+      badge.textContent = 'KIOSCO detectado';
+      badge.className = 'rounded-xl px-4 py-3 text-center font-bold text-sm bg-walmart/10 text-walmart-dark border border-walmart/30';
+      btn.disabled = false;
     }
+  }
+
+  // ── Validacion numero de pedido ────────────────────────────────
+  function validarPedido(input) {
+    const val = input.value.replace(/\D/g, '');
+    input.value = val;
+    const err = document.getElementById('order-local-error');
+    window._saleError = false;
+
+    if (val.length > 0 && val.length !== 13 && val.length !== 15) {
+      err.textContent = `Debe tener 13 o 15 digitos (tiene ${val.length})`;
+      err.classList.remove('hidden');
+      window._saleError = true;
+      detectarTipo('');
+    } else {
+      err.classList.add('hidden');
+      detectarTipo(val);
+    }
+  }
+
+  // Bloquear submit si hay error local
+  document.addEventListener('htmx:confirm', function(e) {
+    if (window._saleError) { e.preventDefault(); }
   });
+
+  // ── Preview monto sin IVA ─────────────────────────────
+  function previsualizarMonto(val) {
+    const preview = document.getElementById('monto-preview');
+    const v = parseFloat(val);
+    if (v > 0) {
+      const sinIva = (v / 1.16).toFixed(2);
+      preview.textContent = `Sin IVA: $${parseFloat(sinIva).toLocaleString('es-MX', {minimumFractionDigits:2})} MXN`;
+    } else {
+      preview.textContent = '';
+    }
+  }
+
+  // ── Auto-tab desde URL (?tab=conc) ────────────────
+  (function () {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('tab') === 'conc') switchTab('conc');
+  })();
+
+  // ── Tabs ───────────────────────────────────────────────────────────
+  // La navegación ya está en el navbar; switchTab solo alterna paneles
+  function switchTab(tab) {
+    const prod = document.getElementById('panel-prod');
+    const conc = document.getElementById('panel-conc');
+    if (tab === 'prod') {
+      prod.classList.remove('hidden');
+      conc.classList.add('hidden');
+    } else {
+      prod.classList.add('hidden');
+      conc.classList.remove('hidden');
+      htmx.ajax('GET', '/concentrado?year={{ year }}&month={{ month }}', {
+        target: '#panel-conc',
+        swap: 'innerHTML'
+      });
+    }
+  }
 </script>
 {% endblock %}
