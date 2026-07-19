@@ -1,0 +1,138 @@
+<!-- partials/team_matrix.html — Tabla tipo Excel: Asociado x Día con Gana+/Kiosco -->
+<div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden mb-6">
+  <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+    <div>
+      <h3 class="font-bold text-gray-700 text-sm uppercase tracking-wide">
+        Matriz de Ventas &mdash; {{ months_es[month-1] }} {{ year }}
+      </h3>
+      <p class="text-xs text-gray-400 mt-0.5">
+        Gana+ y Kiosco por día &nbsp;&middot;&nbsp; desplázate horizontalmente para ver todos los días
+      </p>
+    </div>
+    <span class="text-xs text-gray-400">{{ matrix.members | length }} asociados</span>
+  </div>
+
+  <div class="overflow-x-auto">
+    <table class="text-xs border-collapse" style="min-width: max-content;">
+      <!-- ENCABEZADO FILA 1: días -->
+      <thead>
+        <tr class="bg-gray-800 text-white">
+          <!-- Columnas fijas -->
+          <th class="px-3 py-2 text-left font-bold whitespace-nowrap border-r border-gray-600"
+              rowspan="2" style="min-width:160px;">
+            NOMBRE
+          </th>
+          <th class="px-3 py-2 text-center font-bold whitespace-nowrap border-r border-gray-600"
+              rowspan="2" style="min-width:70px;">
+            VENTA<br>GANA+<br>ACUM.
+          </th>
+          <th class="px-3 py-2 text-center font-bold whitespace-nowrap border-r border-gray-700"
+              rowspan="2" style="min-width:70px;">
+            VENTA<br>KIOSCO<br>ACUM.
+          </th>
+          <!-- Un th por cada día (colspan=2) -->
+          {% for d in matrix.day_range %}
+          <th class="px-2 py-1 text-center font-bold border-r border-gray-600"
+              colspan="2" style="min-width:88px;">
+            {{ d }}
+          </th>
+          {% endfor %}
+        </tr>
+
+        <!-- ENCABEZADO FILA 2: Gana+ / Kiosco por día -->
+        <tr class="bg-gray-700 text-gray-200">
+          {% for d in matrix.day_range %}
+          <th class="px-2 py-1 text-center font-semibold border-r border-gray-600"
+              style="min-width:44px;">GANA+</th>
+          <th class="px-2 py-1 text-center font-semibold border-r border-gray-600"
+              style="min-width:44px;">KIOSCO</th>
+          {% endfor %}
+        </tr>
+      </thead>
+
+      <!-- CUERPO: una fila por asociado -->
+      <tbody>
+        {% for m in matrix.members %}
+        {% set row_bg = "bg-white" if loop.index is odd else "bg-gray-50" %}
+        <tr class="{{ row_bg }} hover:bg-blue-50 border-b border-gray-100">
+          <!-- Nombre -->
+          <td class="px-3 py-2 font-semibold text-gray-800 whitespace-nowrap border-r border-gray-200">
+            {{ m.name }}
+            {% if m.tienda %}
+            <span class="block text-xs text-gray-400 font-normal">{{ m.tienda }}</span>
+            {% endif %}
+          </td>
+          <!-- Total Gana+ acumulado -->
+          <td class="px-3 py-2 text-center font-bold border-r border-gray-200
+                     {% if m.total_gana > 0 %}text-wmgreen{% else %}text-gray-300{% endif %}">
+            {% if m.total_gana > 0 %}{{ m.total_gana | int }}{% else %}&mdash;{% endif %}
+          </td>
+          <!-- Total Kiosco acumulado -->
+          <td class="px-3 py-2 text-center font-bold border-r border-gray-300
+                     {% if m.total_kiosko > 0 %}text-walmart{% else %}text-gray-300{% endif %}">
+            {% if m.total_kiosko > 0 %}{{ m.total_kiosko | int }}{% else %}&mdash;{% endif %}
+          </td>
+          <!-- Un par de celdas por día -->
+          {% for d in matrix.day_range %}
+          {% set day_data = m.days.get(d, {}) %}
+          {% set gp = day_data.get('gana_plus', 0) if day_data else 0 %}
+          {% set ki = day_data.get('kiosko',    0) if day_data else 0 %}
+          <!-- Gana+ del día -->
+          <td class="px-2 py-2 text-center border-r border-gray-100
+                     {% if gp > 0 %}bg-wmgreen/10 text-wmgreen font-bold{% else %}text-gray-200{% endif %}">
+            {% if gp > 0 %}{{ gp | int }}{% else %}&mdash;{% endif %}
+          </td>
+          <!-- Kiosco del día -->
+          <td class="px-2 py-2 text-center border-r border-gray-200
+                     {% if ki > 0 %}bg-walmart/10 text-walmart font-bold{% else %}text-gray-200{% endif %}">
+            {% if ki > 0 %}{{ ki | int }}{% else %}&mdash;{% endif %}
+          </td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+
+        {% if not matrix.members %}
+        <tr>
+          <td colspan="3" class="px-4 py-8 text-center text-gray-400 italic">
+            Sin asociados registrados.
+          </td>
+        </tr>
+        {% endif %}
+      </tbody>
+
+      <!-- TOTALES del equipo -->
+      {% if matrix.members %}
+      {% set total_gana_eq   = matrix.members | sum(attribute='total_gana') %}
+      {% set total_kiosko_eq = matrix.members | sum(attribute='total_kiosko') %}
+      <tfoot>
+        <tr class="bg-yellow-50 font-bold text-gray-700 border-t-2 border-yellow-300">
+          <td class="px-3 py-2 border-r border-gray-300">TOTAL EQUIPO</td>
+          <td class="px-3 py-2 text-center text-wmgreen border-r border-gray-300">
+            {{ total_gana_eq | int }}
+          </td>
+          <td class="px-3 py-2 text-center text-walmart border-r border-gray-400">
+            {{ total_kiosko_eq | int }}
+          </td>
+          {% for d in matrix.day_range %}
+          {% set sum_gp = namespace(v=0) %}
+          {% set sum_ki = namespace(v=0) %}
+          {% for m in matrix.members %}
+            {% set dd = m.days.get(d, {}) %}
+            {% set sum_gp.v = sum_gp.v + (dd.get('gana_plus', 0) if dd else 0) %}
+            {% set sum_ki.v = sum_ki.v + (dd.get('kiosko',    0) if dd else 0) %}
+          {% endfor %}
+          <td class="px-2 py-2 text-center border-r border-gray-200
+                     {% if sum_gp.v > 0 %}text-wmgreen{% else %}text-gray-300{% endif %}">
+            {% if sum_gp.v > 0 %}{{ sum_gp.v | int }}{% else %}&mdash;{% endif %}
+          </td>
+          <td class="px-2 py-2 text-center border-r border-gray-300
+                     {% if sum_ki.v > 0 %}text-walmart{% else %}text-gray-300{% endif %}">
+            {% if sum_ki.v > 0 %}{{ sum_ki.v | int }}{% else %}&mdash;{% endif %}
+          </td>
+          {% endfor %}
+        </tr>
+      </tfoot>
+      {% endif %}
+    </table>
+  </div>
+</div>
