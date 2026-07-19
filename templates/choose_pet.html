@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}Escoge tu Mascota{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto">
+
+  <!-- Header -->
+  <div class="text-center mb-8">
+    <div class="text-5xl mb-3">Bienvenido al Mundo Tamagotchi</div>
+    <h1 class="text-2xl font-black text-walmart-dark">Escoge tu compañero de productividad</h1>
+    <p class="text-gray-500 mt-1 text-sm">
+      Cada venta que registres te dará monedas para cuidarlo.<br>
+      <span class="font-semibold text-walmart">KIOSKO = 2 monedas &nbsp;·&nbsp; GANA+ = 3 monedas</span>
+    </p>
+  </div>
+
+  <form method="post" action="/mascota/escoger">
+
+    <!-- Seleccion de animal -->
+    <p class="text-sm font-bold text-gray-600 uppercase tracking-wide mb-3">Elige tu animal</p>
+    <div class="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-6">
+      {% for a in animals %}
+      <label class="cursor-pointer">
+        <input type="radio" name="animal_type" value="{{ a.id }}"
+               class="peer sr-only" {% if loop.first %}checked{% endif %} required>
+        <div class="border-2 border-gray-200 rounded-2xl p-4 text-center transition-all
+                    peer-checked:border-walmart peer-checked:bg-walmart/5
+                    hover:border-walmart/50 hover:bg-gray-50">
+          <div class="mb-2 mx-auto" style="width:70px;">
+            {{ eggs_svg[a.id] | safe }}
+          </div>
+          <p class="font-bold text-gray-800 text-sm">{{ a.nombre }}</p>
+          <p class="text-xs text-gray-500 mt-0.5">{{ a.desc }}</p>
+        </div>
+      </label>
+      {% endfor %}
+    </div>
+
+    <!-- Nombre -->
+    <div class="mb-6">
+      <label class="block text-sm font-bold text-gray-600 uppercase tracking-wide mb-2">
+        Ponle nombre a tu mascota
+      </label>
+      <input type="text" name="pet_name" maxlength="30" placeholder="Ej: Fido, Luna, Kira..."
+             class="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-base font-semibold
+                    focus:outline-none focus:border-walmart transition"
+             required>
+    </div>
+
+    <!-- Tabla de evolucion -->
+    <div class="bg-gray-50 rounded-2xl p-4 mb-6 text-xs text-gray-600">
+      <p class="font-bold text-gray-700 mb-2 uppercase tracking-wide text-[10px]">Etapas de evolucion</p>
+      <div class="grid grid-cols-4 gap-2 text-center">
+        <div class="bg-white rounded-xl p-2 border border-gray-100">
+          <div class="font-bold text-[10px]">HUEVO</div>
+          <div class="text-gray-400 text-[9px]">Inicio</div>
+        </div>
+        <div class="bg-white rounded-xl p-2 border border-gray-100">
+          <div class="font-bold text-[10px]">BEBE</div>
+          <div class="text-gray-400 text-[9px]">1 XP</div>
+        </div>
+        <div class="bg-white rounded-xl p-2 border border-gray-100">
+          <div class="font-bold text-[10px]">JOVEN</div>
+          <div class="text-gray-400 text-[9px]">80 XP</div>
+        </div>
+        <div class="bg-white rounded-xl p-2 border border-gray-100">
+          <div class="font-bold text-[10px]">ADULTO</div>
+          <div class="text-gray-400 text-[9px]">250 XP</div>
+        </div>
+      </div>
+    </div>
+
+    <button type="submit"
+            class="w-full bg-walmart hover:bg-walmart-dark text-white font-black py-4 rounded-2xl
+                   text-lg transition shadow-md shadow-walmart/20">
+      Adoptar mi mascota
+    </button>
+  </form>
+
+</div>
+{% endblock %}
