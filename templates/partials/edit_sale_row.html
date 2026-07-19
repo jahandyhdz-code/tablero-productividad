@@ -1,0 +1,60 @@
+<!-- partials/edit_sale_row.html — Fila de edición inline via HTMX -->
+<tr id="row-{{ e.id }}" class="border-t border-walmart/30 bg-walmart/5">
+  <td class="px-4 py-2 text-sm text-gray-500">{{ e.entry_date }}</td>
+
+  <!-- Gana+ editable -->
+  <td class="px-4 py-2 text-right">
+    <input
+      id="edit-gp-{{ e.id }}" name="gana_plus"
+      type="number" min="0" step="1"
+      value="{{ e.units_gana_plus | int }}"
+      class="w-20 border border-spark rounded-lg px-2 py-1 text-sm text-right
+             focus:ring-2 focus:ring-spark focus:outline-none" />
+  </td>
+
+  <!-- Kiosco editable -->
+  <td class="px-4 py-2 text-right">
+    <input
+      id="edit-ki-{{ e.id }}" name="kiosko"
+      type="number" min="0" step="1"
+      value="{{ e.units_kiosko | int }}"
+      class="w-20 border border-blue-400 rounded-lg px-2 py-1 text-sm text-right
+             focus:ring-2 focus:ring-blue-400 focus:outline-none" />
+  </td>
+
+  <!-- Total (lectura, se recalcula en el servidor) -->
+  <td class="px-4 py-2 text-sm font-bold text-walmart text-right">
+    {{ e.units_sold | int }}
+  </td>
+
+  <!-- Acciones -->
+  <td class="px-4 py-2 text-right">
+    <div class="flex items-center justify-end gap-2">
+      <!-- Campos ocultos para contexto -->
+      <input type="hidden" id="edit-yr-{{ e.id }}"  name="year"  value="{{ year }}" />
+      <input type="hidden" id="edit-mo-{{ e.id }}"  name="month" value="{{ month }}" />
+
+      <!-- Guardar -->
+      <button
+        hx-put="/sales/{{ e.id }}"
+        hx-include="#edit-gp-{{ e.id }},#edit-ki-{{ e.id }},#edit-yr-{{ e.id }},#edit-mo-{{ e.id }}"
+        hx-target="#productivity-cards"
+        hx-swap="outerHTML"
+        class="text-xs bg-wmgreen text-white font-bold px-3 py-1 rounded-lg
+               hover:bg-green-700 transition">
+        Guardar
+      </button>
+
+      <!-- Cancelar: recarga todo el historial (OOB swap) -->
+      <button
+        hx-get="/?year={{ year }}&month={{ month }}"
+        hx-target="body"
+        hx-push-url="false"
+        onclick="window.location.reload(); return false;"
+        class="text-xs text-gray-500 hover:text-gray-700 font-semibold
+               px-2 py-1 rounded-lg hover:bg-gray-100 transition">
+        Cancelar
+      </button>
+    </div>
+  </td>
+</tr>
