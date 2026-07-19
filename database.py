@@ -305,6 +305,15 @@ def _pg_init(conn):
         xp_won     INTEGER NOT NULL DEFAULT 0,
         result     TEXT
     );
+    CREATE TABLE IF NOT EXISTS user_meta (
+        id          SERIAL PRIMARY KEY,
+        user_id     INTEGER NOT NULL REFERENCES users(id),
+        year        INTEGER NOT NULL,
+        month       INTEGER NOT NULL,
+        meta_tienda REAL    NOT NULL DEFAULT 0,
+        plantilla   INTEGER NOT NULL DEFAULT 1,
+        UNIQUE(user_id, year, month)
+    );
     """)
 
 
@@ -581,7 +590,7 @@ def set_user_meta(user_id: int, year: int, month: int,
     individual = round(meta_tienda / plantilla, 1)
 
     with get_conn() as conn:
-        conn.execute("""
+        _exec(conn, """
             INSERT INTO user_meta (user_id, year, month, meta_tienda, plantilla)
             VALUES (?,?,?,?,?)
             ON CONFLICT(user_id, year, month)
