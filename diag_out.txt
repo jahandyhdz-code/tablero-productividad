@@ -1,0 +1,19 @@
+=== ENTRADAS JULIO 2026 (RAW DB) ===
+  id=9 | fecha=2026-07-15 | asesor=JAHANDY HERNANDEZ | tienda='1° de Mayo' | gana=0.0 | kiosko=1.0 | monto=12931.03 | status=pendiente | pedido=333333334434366
+  id=8 | fecha=2026-07-15 | asesor=JAHANDY HERNANDEZ | tienda='1° de Mayo' | gana=0.0 | kiosko=1.0 | monto=17241.38 | status=pendiente | pedido=222222223333333
+  id=7 | fecha=2026-07-15 | asesor=JAHANDY HERNANDEZ | tienda='1° de Mayo' | gana=0.0 | kiosko=1.0 | monto=862.07 | status=embarcado | pedido=123412341234123
+  id=6 | fecha=2026-07-14 | asesor=JAHANDY HERNANDEZ | tienda='1° de Mayo' | gana=1.0 | kiosko=0.0 | monto=862.07 | status=entregado | pedido=3333333333333
+  id=5 | fecha=2026-07-14 | asesor=jahandita | tienda='1° de Mayo' | gana=1.0 | kiosko=0.0 | monto=0.0 | status=pendiente | pedido=None
+
+Total entradas: 5
+
+=== ENTRADAS EXCLUIDAS POR STATUS ===
+  Ninguna excluida por status
+
+=== RESULTADO get_concentrado_tienda ===
+Entradas en resultado: 5
+Associates: 2
+total_general: 5
+total_monto: 31896.550000000003
+  JAHANDY HERNANDEZ: total=4 monto=31896.550000000003 meta_pct=127.6
+  jahandita: total=1 monto=0.0 meta_pct=None
