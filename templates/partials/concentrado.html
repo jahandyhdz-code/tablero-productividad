@@ -1,0 +1,361 @@
+<!-- partials/concentrado.html — Concentrado de ventas de la tienda -->
+
+<!-- ── Cards de totales ─────────────────────────────────────────────── -->
+<div class="grid grid-cols-2 sm:grid-cols-5 gap-4 mb-6">
+
+  <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 col-span-2 sm:col-span-1">
+    <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Total pedidos</p>
+    <p class="text-4xl font-black text-walmart">{{ data.total_general }}</p>
+    <p class="text-xs text-gray-400 mt-1">{{ tienda }}</p>
+  </div>
+
+  <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-4">
+    <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Gana+</p>
+    <p class="text-3xl font-black text-spark-dark">{{ data.total_gana }}</p>
+    <p class="text-xs text-gray-400 mt-1">13 digitos</p>
+  </div>
+
+  <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-4">
+    <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Kiosko</p>
+    <p class="text-3xl font-black text-blue-600">{{ data.total_kiosko }}</p>
+    <p class="text-xs text-gray-400 mt-1">15 digitos</p>
+  </div>
+
+  <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-4">
+    <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Asesores</p>
+    <p class="text-3xl font-black text-gray-700">{{ data.associates | length }}</p>
+    <p class="text-xs text-gray-400 mt-1">Con capturas</p>
+  </div>
+
+  <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-4">
+    <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Monto s/IVA</p>
+    <p class="text-2xl font-black text-green-700">
+      ${{ "{:,.0f}".format(data.total_monto) }}
+    </p>
+    <p class="text-xs text-gray-400 mt-1">MXN</p>
+  </div>
+
+</div>
+
+<!-- ── Resumen por asesor ───────────────────────────────────────────── -->
+{% if data.associates %}
+<div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden mb-6">
+  <div class="px-5 py-3 border-b border-gray-200">
+    <h3 class="font-bold text-gray-700 text-sm uppercase tracking-wide">
+      Desempeño por asesor &mdash; {{ months_es[month-1] }} {{ year }}
+    </h3>
+  </div>
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead class="bg-gray-50 text-xs font-semibold text-gray-500 uppercase">
+        <tr>
+          <!-- Asesor -->
+          <th class="px-4 py-3 text-left">Asesor</th>
+          <!-- Gana+ -->
+          <th class="px-4 py-3 text-right whitespace-nowrap">Pedidos Gana+</th>
+          <th class="px-4 py-3 text-right whitespace-nowrap">Monto Gana+</th>
+          <!-- Kiosko -->
+          <th class="px-4 py-3 text-right whitespace-nowrap">Pedidos Kiosko</th>
+          <th class="px-4 py-3 text-right whitespace-nowrap">Monto Kiosko</th>
+          <!-- Totales -->
+          <th class="px-4 py-3 text-right whitespace-nowrap">Total Pedidos</th>
+          <th class="px-4 py-3 text-right whitespace-nowrap">Total Monto</th>
+          <!-- Alcances -->
+          <th class="px-4 py-3 text-center whitespace-nowrap">Meta Individual</th>
+          <th class="px-4 py-3 text-center whitespace-nowrap">Alcance Tienda</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for a in data.associates %}
+        <tr class="border-t border-gray-100 hover:bg-blue-50/40 transition
+                   {% if a.associate_number == me %}bg-walmart/5{% endif %}">
+
+          <!-- Asesor -->
+          <td class="px-4 py-3">
+            <span class="font-semibold text-gray-800">{{ a.name }}</span>
+            {% if a.associate_number == me %}
+            <span class="ml-1 text-[10px] bg-walmart text-white px-1.5 py-0.5 rounded-full font-bold">Yo</span>
+            {% endif %}
+            <span class="text-xs text-gray-400 block">#{{ a.associate_number }}</span>
+          </td>
+
+          <!-- Pedidos Gana+ -->
+          <td class="px-4 py-3 text-right font-semibold text-amber-700">{{ a.gana }}</td>
+
+          <!-- Monto Gana+ -->
+          <td class="px-4 py-3 text-right text-amber-600 whitespace-nowrap">
+            {% if a.monto_gana > 0 %}
+              ${{ "{:,.0f}".format(a.monto_gana) }}
+            {% else %}
+              <span class="text-gray-300">&mdash;</span>
+            {% endif %}
+          </td>
+
+          <!-- Pedidos Kiosko -->
+          <td class="px-4 py-3 text-right font-semibold text-blue-600">{{ a.kiosko }}</td>
+
+          <!-- Monto Kiosko -->
+          <td class="px-4 py-3 text-right text-blue-500 whitespace-nowrap">
+            {% if a.monto_kiosko > 0 %}
+              ${{ "{:,.0f}".format(a.monto_kiosko) }}
+            {% else %}
+              <span class="text-gray-300">&mdash;</span>
+            {% endif %}
+          </td>
+
+          <!-- Total Pedidos -->
+          <td class="px-4 py-3 text-right font-black text-walmart">{{ a.total }}</td>
+
+          <!-- Total Monto -->
+          <td class="px-4 py-3 text-right font-bold text-green-700 whitespace-nowrap">
+            {% if a.monto_total > 0 %}
+              ${{ "{:,.0f}".format(a.monto_total) }}
+            {% else %}
+              <span class="text-gray-300">&mdash;</span>
+            {% endif %}
+          </td>
+
+          <!-- Meta Individual -->
+          <td class="px-4 py-3 text-center">
+            {% if a.meta_pct is not none %}
+              {% if a.meta_pct >= 100 %}
+                {% set meta_cls = "bg-green-100 text-green-700" %}
+              {% elif a.meta_pct >= 75 %}
+                {% set meta_cls = "bg-spark/10 text-spark-dark" %}
+              {% else %}
+                {% set meta_cls = "bg-gray-100 text-gray-600" %}
+              {% endif %}
+              <div class="flex flex-col items-center gap-0.5">
+                <span class="text-xs font-bold {{ meta_cls }} px-2 py-0.5 rounded-full">
+                  {{ a.meta_pct }}%
+                </span>
+                {% if a.meta_objetivo %}
+                <span class="text-[10px] text-gray-400">
+                  meta ${{ "{:,.0f}".format(a.meta_objetivo) }}
+                </span>
+                {% endif %}
+              </div>
+            {% else %}
+              <span class="text-xs text-gray-300">Sin meta</span>
+            {% endif %}
+          </td>
+
+          <!-- Alcance Total Tienda -->
+          <td class="px-4 py-3 text-center">
+            <div class="flex flex-col items-center gap-1">
+              <div class="w-16 bg-gray-100 rounded-full h-1.5">
+                <div class="bg-walmart h-1.5 rounded-full"
+                     style="width:{{ a.pct_tienda if a.pct_tienda <= 100 else 100 }}%"></div>
+              </div>
+              <span class="text-xs text-gray-500">{{ a.pct_tienda }}%</span>
+            </div>
+          </td>
+
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+<!-- ── Detalle de pedidos ───────────────────────────────────────────── -->
+<div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+  <div class="px-5 py-3 border-b border-gray-200 flex items-center justify-between">
+    <h3 class="font-bold text-gray-700 text-sm uppercase tracking-wide">
+      Detalle de pedidos &mdash; {{ months_es[month-1] }} {{ year }}
+    </h3>
+    <span class="text-xs text-gray-400">{{ data.entries | length }} registros</span>
+  </div>
+
+  {% if data.entries %}
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead class="bg-gray-50 text-xs font-semibold text-gray-500 uppercase">
+        <tr>
+          <th class="px-4 py-3 text-left">Fecha</th>
+          <th class="px-4 py-3 text-left">Pedido</th>
+          <th class="px-4 py-3 text-left">Asesor</th>
+          <th class="px-4 py-3 text-left">Descripci&oacute;n</th>
+          <th class="px-4 py-3 text-center">Canal</th>
+          <th class="px-4 py-3 text-right">Monto s/IVA</th>
+          <th class="px-4 py-3 text-center">Estatus</th>
+          <th class="px-4 py-3"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for e in data.entries %}
+        {% if e.units_gana_plus and e.units_gana_plus > 0 %}
+          {% set tipo_cls   = "bg-amber-50 text-amber-700 border border-amber-200" %}
+          {% set tipo_label = "Gana+" %}
+        {% elif e.units_kiosko and e.units_kiosko > 0 %}
+          {% set tipo_cls   = "bg-blue-50 text-blue-700 border border-blue-200" %}
+          {% set tipo_label = "Kiosko" %}
+        {% else %}
+          {% set tipo_cls   = "bg-gray-50 text-gray-400" %}
+          {% set tipo_label = "—" %}
+        {% endif %}
+
+        {% if e.status == "entregado" %}
+          {% set st_cls = "bg-green-100 text-green-700" %}
+        {% elif e.status == "embarcado" %}
+          {% set st_cls = "bg-blue-100 text-blue-700" %}
+        {% elif e.status == "cancelado" %}
+          {% set st_cls = "bg-red-100 text-red-700" %}
+        {% elif e.status == "devolucion" %}
+          {% set st_cls = "bg-orange-100 text-orange-700" %}
+        {% elif e.status == "pagado" %}
+          {% set st_cls = "bg-purple-100 text-purple-700" %}
+        {% else %}
+          {% set st_cls = "bg-gray-100 text-gray-600" %}
+        {% endif %}
+
+        <tr id="conc-row-{{ e.id }}" class="border-t border-gray-100 hover:bg-blue-50/40 transition
+                   {% if e.associate_number == me %}bg-walmart/5{% endif %}">
+
+          <!-- Fecha -->
+          <td class="px-4 py-3 text-gray-600 whitespace-nowrap text-xs">{{ e.entry_date }}</td>
+
+          <!-- Pedido -->
+          <td class="px-4 py-3">
+            {% if e.order_number %}
+              <span class="font-mono text-[11px] bg-gray-100 px-2 py-0.5 rounded-lg tracking-wide text-gray-700">
+                {{ e.order_number }}
+              </span>
+            {% else %}
+              <span class="text-gray-300 text-xs">&mdash;</span>
+            {% endif %}
+          </td>
+
+          <!-- Asesor -->
+          <td class="px-4 py-3">
+            <span class="font-medium text-gray-800 text-xs">{{ e.associate_name }}</span>
+            {% if e.associate_number == me %}
+            <span class="ml-1 text-[10px] bg-walmart text-white px-1.5 py-0.5 rounded-full font-bold">Yo</span>
+            {% endif %}
+            <span class="text-[10px] text-gray-400 block">#{{ e.associate_number }}</span>
+          </td>
+
+          <!-- Descripcion -->
+          <td class="px-4 py-3 text-xs text-gray-600 max-w-[180px]">
+            {% if e.descripcion %}
+              <span class="line-clamp-2" title="{{ e.descripcion }}">{{ e.descripcion }}</span>
+            {% else %}
+              <span class="text-gray-300">&mdash;</span>
+            {% endif %}
+          </td>
+
+          <!-- Canal (Gana+ / Kiosko) -->
+          <td class="px-4 py-3 text-center">
+            <span class="text-xs font-bold {{ tipo_cls }} px-2 py-0.5 rounded-full">
+              {{ tipo_label }}
+            </span>
+          </td>
+
+          <!-- Monto sin IVA -->
+          <td class="px-4 py-3 text-right font-semibold text-green-700 whitespace-nowrap">
+            {% if e.amount_sin_iva and e.amount_sin_iva > 0 %}
+              ${{ "{:,.2f}".format(e.amount_sin_iva) }}
+            {% else %}
+              <span class="text-gray-300">&mdash;</span>
+            {% endif %}
+          </td>
+
+          <!-- Estatus — select con JS puro -->
+          <td class="px-4 py-3 text-center">
+            <select id="st-{{ e.id }}"
+                    onchange="cambiarEstatus({{ e.id }}, this, {{ year }}, {{ month }})"
+                    style="appearance:auto"
+                    class="text-xs font-bold {{ st_cls }} rounded-lg px-2 py-1
+                           cursor-pointer focus:outline-none focus:ring-1 focus:ring-walmart">
+              {% for opt, lbl in [
+                ('pendiente',  'Pendiente'),
+                ('embarcado',  'Embarcado'),
+                ('entregado',  'Entregado'),
+                ('cancelado',  'Cancelado'),
+                ('devolucion', 'Devolucion'),
+                ('pagado',     'Pagado')
+              ] %}
+              <option value="{{ opt }}" {% if (e.status or 'pendiente') == opt %}selected{% endif %}>
+                {{ lbl }}
+              </option>
+              {% endfor %}
+            </select>
+          </td>
+
+          <!-- Boton Eliminar (solo filas del propio usuario) -->
+          <td class="px-3 py-3 text-right">
+            {% if e.associate_number == me %}
+            <button
+              onclick="eliminarPedido({{ e.id }}, {{ year }}, {{ month }})"
+              class="text-xs text-red-500 hover:text-red-700 font-semibold
+                     px-2 py-1 rounded-lg hover:bg-red-50 transition">
+              Eliminar
+            </button>
+            {% endif %}
+          </td>
+
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="px-5 py-12 text-center text-gray-400">
+    <p class="text-4xl mb-2"></p>
+    <p class="text-sm">Sin pedidos registrados en {{ tienda }} este mes.</p>
+  </div>
+  {% endif %}
+</div>
+
+<script>
+// ── Estilos por estatus ────────────────────────────────
+const ST_CLASSES = {
+  pendiente:  'bg-gray-100 text-gray-600',
+  embarcado:  'bg-blue-100 text-blue-700',
+  entregado:  'bg-green-100 text-green-700',
+  cancelado:  'bg-red-100 text-red-700',
+  devolucion: 'bg-orange-100 text-orange-700',
+  pagado:     'bg-purple-100 text-purple-700',
+};
+const ST_BASE = 'text-xs font-bold rounded-lg px-2 py-1 cursor-pointer focus:outline-none focus:ring-1 focus:ring-walmart';
+
+// ── Cambiar estatus + refrescar concentrado ──────────────────
+function cambiarEstatus(entryId, sel, year, month) {
+  const status = sel.value;
+  // Feedback visual inmediato en el select
+  sel.className = ST_BASE + ' ' + (ST_CLASSES[status] || ST_CLASSES.pendiente);
+  sel.disabled = true;
+
+  const body = new URLSearchParams({
+    status: status,
+    year:   year,
+    month:  month,
+  });
+
+  fetch('/concentrado/status/' + entryId, {
+    method:  'POST',
+    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+    body:    body.toString(),
+  })
+  .then(r => r.text())
+  .then(html => {
+    const panel = document.getElementById('panel-conc');
+    if (panel) panel.innerHTML = html;
+  })
+  .catch(() => { sel.disabled = false; });
+}
+
+// ── Eliminar pedido propio y recargar concentrado ────────────
+function eliminarPedido(entryId, year, month) {
+  if (!confirm('Eliminar este pedido?')) return;
+  fetch('/concentrado/entry/' + entryId + '?year=' + year + '&month=' + month, {
+    method: 'DELETE'
+  })
+  .then(r => r.text())
+  .then(html => {
+    const panel = document.getElementById('panel-conc');
+    if (panel) panel.innerHTML = html;
+  });
+}
+</script>
