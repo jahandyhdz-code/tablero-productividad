@@ -9,7 +9,7 @@ echo   SUBIENDO CAMBIOS A INTERNET...
 echo  ================================================
 echo.
 
-uv run python deploy_render.py
+uv run python quick_deploy.py
 
 echo.
 echo  ================================================
