@@ -1,0 +1,268 @@
+{% extends "base.html" %}
+{% block title %}Minijuego - {{ pet.pet_name }}{% endblock %}
+
+{% block head %}
+<style>
+  #game-board {
+    position: relative;
+    width: 100%;
+    height: 280px;
+    background: linear-gradient(180deg, #87ceeb 0%, #87ceeb 65%, #8fbc8f 65%);
+    border-radius: 1.25rem;
+    overflow: hidden;
+    cursor: crosshair;
+    user-select: none;
+    touch-action: manipulation;
+  }
+  .coin {
+    position: absolute;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, #ffe066, #ffc220 60%, #995213);
+    border: 3px solid #ffd700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 900;
+    font-size: 18px;
+    color: #7a4200;
+    box-shadow: 0 4px 12px rgba(255,194,32,.6);
+    cursor: pointer;
+    transition: transform .1s;
+    animation: coin-drop 1.5s ease-in forwards;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .coin:hover { transform: scale(1.12); }
+  @keyframes coin-drop {
+    0%   { opacity:0; transform: translateY(-30px) scale(.5); }
+    15%  { opacity:1; transform: translateY(0) scale(1.1); }
+    80%  { opacity:1; }
+    100% { opacity:0; transform: scale(.8); }
+  }
+  .pop-text {
+    position: absolute;
+    font-weight: 900;
+    font-size: 22px;
+    color: #ffc220;
+    pointer-events: none;
+    animation: float-up .8s ease forwards;
+    text-shadow: 0 2px 6px rgba(0,0,0,.4);
+  }
+  @keyframes float-up {
+    0%   { opacity:1; transform:translateY(0); }
+    100% { opacity:0; transform:translateY(-50px); }
+  }
+  #timer-bar { transition: width .25s linear; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-xl mx-auto">
+
+  <!-- Header -->
+  <div class="flex items-center justify-between mb-5">
+    <div>
+      <h1 class="text-xl font-black text-walmart-dark">Minijuego de Monedas</h1>
+      <p class="text-sm text-gray-500">
+        Atrapa las monedas antes de que desaparezcan!
+        &bull; {{ plays_left }} partida{{ 's' if plays_left != 1 else '' }} restante{{ 's' if plays_left != 1 else '' }} hoy
+      </p>
+    </div>
+    <a href="/mascota"
+       class="text-sm text-gray-500 hover:text-walmart border border-gray-200 px-3 py-2 rounded-xl transition">
+      &larr; Volver
+    </a>
+  </div>
+
+  {% if plays_left == 0 %}
+  <!-- Sin partidas -->
+  <div class="bg-white rounded-2xl p-10 text-center border border-gray-100 shadow-sm">
+    <p class="text-4xl mb-3">Zzz</p>
+    <p class="font-bold text-gray-600">Ya jugaste {{ max_plays }} veces hoy.</p>
+    <p class="text-sm text-gray-400 mt-1">Vuelve manana para mas partidas!</p>
+    <a href="/mascota"
+       class="inline-block mt-4 bg-walmart text-white font-bold px-6 py-2 rounded-xl text-sm hover:bg-walmart-dark transition">
+      Ver mi mascota
+    </a>
+  </div>
+
+  {% else %}
+  <!-- Juego -->
+  <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+
+    <!-- Barra de tiempo -->
+    <div class="bg-gray-100 h-2">
+      <div id="timer-bar" class="h-2 bg-walmart rounded-r-full" style="width:100%"></div>
+    </div>
+
+    <!-- Stats del juego -->
+    <div class="px-5 py-3 flex items-center justify-between">
+      <div class="text-center">
+        <p class="text-xs text-gray-500 font-semibold uppercase">Monedas</p>
+        <p class="text-3xl font-black text-spark" id="score-display">0</p>
+      </div>
+      <div class="text-center">
+        <p class="text-xs text-gray-500 font-semibold uppercase">Tiempo</p>
+        <p class="text-3xl font-black text-walmart" id="time-display">15</p>
+      </div>
+      <div class="text-center">
+        <p class="text-xs text-gray-500 font-semibold uppercase">Meta</p>
+        <p class="text-3xl font-black text-gray-400">{{ max_score }}</p>
+      </div>
+    </div>
+
+    <!-- Tablero -->
+    <div id="game-board">
+      <p id="start-hint"
+         class="absolute inset-0 flex items-center justify-center text-white font-black text-2xl
+                drop-shadow-md pointer-events-none select-none">
+        Presiona INICIAR
+      </p>
+    </div>
+
+    <!-- Botones -->
+    <div class="p-4 flex gap-3">
+      <button id="btn-start"
+              onclick="startGame()"
+              class="flex-1 bg-walmart hover:bg-walmart-dark text-white font-black py-3 rounded-xl
+                     text-base transition shadow-sm">
+        Iniciar partida
+      </button>
+    </div>
+  </div>
+
+  <!-- Resultado (HTMX lo reemplaza) -->
+  <div id="result-zone" class="mt-4"></div>
+
+  {% endif %}
+</div>
+
+{% block scripts %}
+<script>
+  const GAME_DURATION = 15;   // segundos
+  const COIN_LIFETIME = 1400; // ms que dura cada moneda
+  const SPAWN_INTERVAL = 900; // ms entre monedas
+
+  let score      = 0;
+  let timeLeft   = GAME_DURATION;
+  let running    = false;
+  let timerLoop  = null;
+  let spawnLoop  = null;
+  let barInterval = null;
+
+  const board    = document.getElementById('game-board');
+  const scoreEl  = document.getElementById('score-display');
+  const timeEl   = document.getElementById('time-display');
+  const timerBar = document.getElementById('timer-bar');
+  const btnStart = document.getElementById('btn-start');
+  const hint     = document.getElementById('start-hint');
+
+  function startGame() {
+    if (running) return;
+    score   = 0;
+    timeLeft = GAME_DURATION;
+    running = true;
+    btnStart.disabled = true;
+    btnStart.textContent = 'Jugando...';
+    btnStart.classList.add('opacity-50', 'cursor-not-allowed');
+    if (hint) hint.style.display = 'none';
+
+    updateUI();
+
+    // Cuenta regresiva
+    timerLoop = setInterval(() => {
+      timeLeft--;
+      updateUI();
+      if (timeLeft <= 0) endGame();
+    }, 1000);
+
+    // Barra de tiempo suave
+    const startTime = Date.now();
+    barInterval = setInterval(() => {
+      const elapsed = (Date.now() - startTime) / 1000;
+      const pct = Math.max(0, 100 - (elapsed / GAME_DURATION * 100));
+      timerBar.style.width = pct + '%';
+      if (pct <= 30) timerBar.classList.replace('bg-walmart', 'bg-red-500');
+    }, 100);
+
+    // Generar monedas
+    spawnLoop = setInterval(spawnCoin, SPAWN_INTERVAL);
+    spawnCoin(); // la primera al instante
+  }
+
+  function spawnCoin() {
+    if (!running) return;
+
+    const coin = document.createElement('div');
+    coin.className = 'coin';
+    coin.textContent = '$';
+
+    // Posicion aleatoria dentro del tablero (evitar bordes)
+    const maxX = board.offsetWidth - 60;
+    const maxY = board.offsetHeight - 60;
+    coin.style.left = (20 + Math.random() * maxX) + 'px';
+    coin.style.top  = (10 + Math.random() * maxY) + 'px';
+
+    coin.addEventListener('click',      () => catchCoin(coin));
+    coin.addEventListener('touchstart',  (e) => { e.preventDefault(); catchCoin(coin); }, { passive: false });
+    board.appendChild(coin);
+
+    // Auto-destruir si no la atrapa
+    setTimeout(() => coin.remove(), COIN_LIFETIME);
+  }
+
+  function catchCoin(coin) {
+    if (!running) return;
+    const x = coin.style.left;
+    const y = coin.style.top;
+    coin.remove();
+    score++;
+    updateUI();
+
+    // Efecto "+1"
+    const pop = document.createElement('div');
+    pop.className = 'pop-text';
+    pop.textContent = '+1';
+    pop.style.left = x;
+    pop.style.top  = parseInt(y) - 10 + 'px';
+    board.appendChild(pop);
+    setTimeout(() => pop.remove(), 800);
+  }
+
+  function updateUI() {
+    scoreEl.textContent = score;
+    timeEl.textContent  = timeLeft;
+    // Color del tiempo
+    timeEl.className = 'text-3xl font-black ' + (timeLeft <= 5 ? 'text-red-500' : 'text-walmart');
+  }
+
+  function endGame() {
+    running = false;
+    clearInterval(timerLoop);
+    clearInterval(spawnLoop);
+    clearInterval(barInterval);
+
+    // Limpiar monedas restantes
+    board.querySelectorAll('.coin').forEach(c => c.remove());
+
+    // Mostrar fin
+    const overlay = document.createElement('div');
+    overlay.className = 'absolute inset-0 bg-black/50 flex flex-col items-center justify-center';
+    overlay.innerHTML = `
+      <p class="text-white font-black text-3xl drop-shadow-lg">Fin!</p>
+      <p class="text-spark font-black text-5xl mt-1 drop-shadow-lg">${score} monedas</p>
+    `;
+    board.appendChild(overlay);
+
+    // Enviar puntuacion via HTMX ajax
+    htmx.ajax('POST', '/mascota/jugar', {
+      target:  '#result-zone',
+      swap:    'innerHTML',
+      values:  { score: score }
+    });
+  }
+</script>
+{% endblock %}
+{% endblock %}
