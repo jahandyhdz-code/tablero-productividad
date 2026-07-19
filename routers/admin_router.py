@@ -209,6 +209,7 @@ async def admin_dashboard(request: Request):
 
     tf        = _tiendas_filter(user)
     team      = db.get_team_productivity(year, month, tiendas_filter=tf)
+    matrix    = db.get_team_matrix(year, month, tiendas_filter=tf)
     all_users = db.get_all_users(tiendas_filter=tf)
     wk_start, wk_end = db.commercial_week(today)
 
@@ -221,6 +222,7 @@ async def admin_dashboard(request: Request):
         "request":          request,
         "user":             user,
         "team":             team,
+        "matrix":           matrix,
         "all_users":        all_users,
         "year":             year,
         "month":            month,
