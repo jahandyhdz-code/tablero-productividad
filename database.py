@@ -183,6 +183,44 @@ def _sqlite_init(conn):
         rest_date TEXT    NOT NULL,
         UNIQUE (user_id, rest_date)
     );
+    CREATE TABLE IF NOT EXISTS pets (
+        id            INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id       INTEGER NOT NULL UNIQUE REFERENCES users(id),
+        animal_type   TEXT    NOT NULL,
+        pet_name      TEXT    NOT NULL DEFAULT 'Mi Mascota',
+        stage         TEXT    NOT NULL DEFAULT 'huevo',
+        coins         INTEGER NOT NULL DEFAULT 0,
+        xp            INTEGER NOT NULL DEFAULT 0,
+        hunger        INTEGER NOT NULL DEFAULT 100,
+        happiness     INTEGER NOT NULL DEFAULT 100,
+        last_activity TEXT    NOT NULL DEFAULT (datetime('now')),
+        created_at    TEXT    NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE TABLE IF NOT EXISTS pet_items (
+        id           INTEGER PRIMARY KEY AUTOINCREMENT,
+        pet_id       INTEGER NOT NULL REFERENCES pets(id),
+        item_type    TEXT    NOT NULL,
+        equipped     INTEGER NOT NULL DEFAULT 0,
+        purchased_at TEXT    NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE TABLE IF NOT EXISTS pet_actions_log (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        pet_id      INTEGER NOT NULL REFERENCES pets(id),
+        action      TEXT    NOT NULL,
+        detail      TEXT,
+        coins_delta INTEGER NOT NULL DEFAULT 0,
+        xp_delta    INTEGER NOT NULL DEFAULT 0,
+        created_at  TEXT    NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE TABLE IF NOT EXISTS game_plays (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id    INTEGER NOT NULL REFERENCES users(id),
+        game_type  TEXT    NOT NULL,
+        played_at  TEXT    NOT NULL DEFAULT (datetime('now')),
+        coins_won  INTEGER NOT NULL DEFAULT 0,
+        xp_won     INTEGER NOT NULL DEFAULT 0,
+        result     TEXT
+    );
     """)
 
 
@@ -229,6 +267,44 @@ def _pg_init(conn):
         rest_date DATE    NOT NULL,
         UNIQUE (user_id, rest_date)
     );
+    CREATE TABLE IF NOT EXISTS pets (
+        id            SERIAL PRIMARY KEY,
+        user_id       INTEGER NOT NULL UNIQUE REFERENCES users(id),
+        animal_type   TEXT    NOT NULL,
+        pet_name      TEXT    NOT NULL DEFAULT 'Mi Mascota',
+        stage         TEXT    NOT NULL DEFAULT 'huevo',
+        coins         INTEGER NOT NULL DEFAULT 0,
+        xp            INTEGER NOT NULL DEFAULT 0,
+        hunger        INTEGER NOT NULL DEFAULT 100,
+        happiness     INTEGER NOT NULL DEFAULT 100,
+        last_activity TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    CREATE TABLE IF NOT EXISTS pet_items (
+        id           SERIAL PRIMARY KEY,
+        pet_id       INTEGER NOT NULL REFERENCES pets(id),
+        item_type    TEXT    NOT NULL,
+        equipped     INTEGER NOT NULL DEFAULT 0,
+        purchased_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    CREATE TABLE IF NOT EXISTS pet_actions_log (
+        id          SERIAL PRIMARY KEY,
+        pet_id      INTEGER NOT NULL REFERENCES pets(id),
+        action      TEXT    NOT NULL,
+        detail      TEXT,
+        coins_delta INTEGER NOT NULL DEFAULT 0,
+        xp_delta    INTEGER NOT NULL DEFAULT 0,
+        created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    CREATE TABLE IF NOT EXISTS game_plays (
+        id         SERIAL PRIMARY KEY,
+        user_id    INTEGER NOT NULL REFERENCES users(id),
+        game_type  TEXT    NOT NULL,
+        played_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        coins_won  INTEGER NOT NULL DEFAULT 0,
+        xp_won     INTEGER NOT NULL DEFAULT 0,
+        result     TEXT
+    );
     """)
 
 
@@ -256,8 +332,20 @@ def run_migrations():
     _add_col_if_missing("users", "tienda",               "TEXT NOT NULL DEFAULT ''")
     _add_col_if_missing("users", "must_change_password",  "INTEGER NOT NULL DEFAULT 0")
     _add_col_if_missing("users", "admin_tiendas",         "TEXT DEFAULT NULL")
-    _add_col_if_missing("sales_entries", "units_gana_plus", "REAL NOT NULL DEFAULT 0")
-    _add_col_if_missing("sales_entries", "units_kiosko",    "REAL NOT NULL DEFAULT 0")
+    _add_col_if_missing("sales_entries", "units_gana_plus",  "REAL NOT NULL DEFAULT 0")
+    _add_col_if_missing("sales_entries", "units_kiosko",     "REAL NOT NULL DEFAULT 0")
+    _add_col_if_missing("sales_entries", "order_number",     "TEXT")
+    _add_col_if_missing("sales_entries", "status",           "TEXT NOT NULL DEFAULT 'pendiente'")
+    _add_col_if_missing("sales_entries", "amount_sin_iva",   "REAL NOT NULL DEFAULT 0")
+    _add_col_if_missing("sales_entries", "almacen",          "TEXT")
+    _add_col_if_missing("sales_entries", "descripcion",      "TEXT")
+    # game_plays se crea en init_db; migracion por si la tabla ya existia sin columnas
+    _add_col_if_missing("game_plays",    "xp_won",           "INTEGER NOT NULL DEFAULT 0")
+    _add_col_if_missing("game_plays",    "result",           "TEXT")
+    # Tamagotchi 2.0 — hambre con decaimiento temporal
+    _add_col_if_missing("pets", "hunger_updated_at",
+                        "TIMESTAMPTZ NOT NULL DEFAULT NOW()" if _USE_PG
+                        else "TEXT NOT NULL DEFAULT (datetime('now'))")
 
 
 # ────────────────────────────────────────────────────────────────────────────
@@ -449,7 +537,61 @@ def get_sales_target(user_id: int, year: int, month: int) -> float | None:
 
 
 # ────────────────────────────────────────────────────────────────────────────
-#  REST DAYS
+#  META MENSUAL + PLANTILLA
+# ────────────────────────────────────────────────────────────────────────────
+
+def _init_user_meta_table(conn) -> None:
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS user_meta (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id     INTEGER NOT NULL,
+            year        INTEGER NOT NULL,
+            month       INTEGER NOT NULL,
+            meta_tienda REAL    NOT NULL DEFAULT 0,
+            plantilla   INTEGER NOT NULL DEFAULT 1,
+            UNIQUE(user_id, year, month)
+        )
+    """)
+    conn.commit()
+
+
+if not _USE_PG:
+    with get_conn() as conn:
+        _init_user_meta_table(conn)
+
+
+def get_user_meta(user_id: int, year: int, month: int) -> dict | None:
+    """Retorna meta_tienda y plantilla del usuario para el mes dado."""
+    with get_conn() as conn:
+        cur = _exec(conn,
+                    "SELECT meta_tienda, plantilla FROM user_meta"
+                    " WHERE user_id=? AND year=? AND month=?",
+                    (user_id, year, month))
+        return _fetchone(cur)
+
+
+def set_user_meta(user_id: int, year: int, month: int,
+                  meta_tienda: float, plantilla: int) -> float:
+    """
+    Guarda meta_tienda y plantilla.
+    Deriva y guarda target individual = meta_tienda / plantilla.
+    Retorna el objetivo individual calculado.
+    """
+    plantilla  = max(plantilla, 1)  # evitar division por cero
+    individual = round(meta_tienda / plantilla, 1)
+
+    with get_conn() as conn:
+        conn.execute("""
+            INSERT INTO user_meta (user_id, year, month, meta_tienda, plantilla)
+            VALUES (?,?,?,?,?)
+            ON CONFLICT(user_id, year, month)
+            DO UPDATE SET meta_tienda=excluded.meta_tienda,
+                          plantilla=excluded.plantilla
+        """, (user_id, year, month, meta_tienda, plantilla))
+
+    # Actualiza el target individual en sales_targets
+    set_sales_target(user_id, year, month, individual)
+    return individual
 # ────────────────────────────────────────────────────────────────────────────
 
 def toggle_rest_day(user_id: int, rest_date: str) -> bool:
@@ -483,23 +625,65 @@ def get_rest_days_for_month(user_id: int, year: int, month: int) -> set:
 #  SALES ENTRIES
 # ────────────────────────────────────────────────────────────────────────────
 
+# Longitudes validas para numero de pedido
+ORDER_NUMBER_LENGTHS = (13, 15)
+
+
+def validate_order_number(order_number: str) -> tuple[bool, str]:
+    """
+    Valida que el numero de pedido sea solo digitos y tenga 13 o 15 caracteres.
+    Retorna (ok, mensaje_error).
+    """
+    num = order_number.strip()
+    if not num.isdigit():
+        return False, "El numero de pedido solo debe contener digitos."
+    if len(num) not in ORDER_NUMBER_LENGTHS:
+        return False, f"El numero de pedido debe tener 13 o 15 digitos (tiene {len(num)})."
+    return True, ""
+
+
+def get_order_number_owner(order_number: str) -> dict | None:
+    """
+    Busca si el numero de pedido ya existe en sales_entries.
+    Retorna dict con name y associate_number del dueno, o None si no existe.
+    """
+    with get_conn() as conn:
+        cur = _exec(conn,
+                    """SELECT u.name, u.associate_number
+                       FROM sales_entries s
+                       JOIN users u ON s.user_id = u.id
+                       WHERE s.order_number = ?
+                       LIMIT 1""",
+                    (order_number.strip(),))
+        return _fetchone(cur)
+
+
 def add_sales_entry(user_id: int, entry_date: str, units_sold: float,
-                    gana_plus: float = 0.0, kiosko: float = 0.0) -> int:
+                    gana_plus: float = 0.0, kiosko: float = 0.0,
+                    order_number: str = "",
+                    amount_sin_iva: float = 0.0,
+                    almacen: str = "",
+                    descripcion: str = "") -> int:
+    num  = order_number.strip() or None
+    alm  = almacen.strip() or None
+    desc = descripcion.strip() or None
     with get_conn() as conn:
         if _USE_PG:
             cur = conn.cursor()
             cur.execute("""
                 INSERT INTO sales_entries
-                (user_id, entry_date, units_sold, units_gana_plus, units_kiosko)
-                VALUES (%s,%s,%s,%s,%s) RETURNING id
-            """, (user_id, entry_date, units_sold, gana_plus, kiosko))
+                (user_id, entry_date, units_sold, units_gana_plus, units_kiosko,
+                 order_number, status, amount_sin_iva, almacen, descripcion)
+                VALUES (%s,%s,%s,%s,%s,%s,'pendiente',%s,%s,%s) RETURNING id
+            """, (user_id, entry_date, units_sold, gana_plus, kiosko, num, amount_sin_iva, alm, desc))
             return cur.fetchone()[0]
         else:
             cur = conn.execute("""
                 INSERT INTO sales_entries
-                (user_id, entry_date, units_sold, units_gana_plus, units_kiosko)
-                VALUES (?,?,?,?,?)
-            """, (user_id, entry_date, units_sold, gana_plus, kiosko))
+                (user_id, entry_date, units_sold, units_gana_plus, units_kiosko,
+                 order_number, status, amount_sin_iva, almacen, descripcion)
+                VALUES (?,?,?,?,?,?,'pendiente',?,?,?)
+            """, (user_id, entry_date, units_sold, gana_plus, kiosko, num, amount_sin_iva, alm, desc))
             return cur.lastrowid
 
 
@@ -517,9 +701,9 @@ def get_sales_for_month(user_id: int, year: int, month: int):
     with get_conn() as conn:
         cur = _exec(conn,
                     f"""SELECT id, entry_date, units_sold,
-                               units_gana_plus, units_kiosko, created_at
+                               units_gana_plus, units_kiosko, created_at, order_number
                         FROM sales_entries
-                        WHERE user_id=? AND {yf} AND {mf}
+                        WHERE user_id=? AND {yf} AND {mf} {_EXCL}
                         ORDER BY entry_date DESC, id DESC""",
                     (user_id, str(year), f"{month:02d}"))
         rows = _fetchall(cur)
@@ -532,8 +716,8 @@ def get_sales_for_month(user_id: int, year: int, month: int):
 def get_sales_for_week(user_id: int, week_start: date, week_end: date) -> float:
     with get_conn() as conn:
         cur = _exec(conn,
-                    """SELECT COALESCE(SUM(units_sold),0) as total FROM sales_entries
-                       WHERE user_id=? AND entry_date>=? AND entry_date<=?""",
+                    f"""SELECT COALESCE(SUM(units_sold),0) as total FROM sales_entries
+                       WHERE user_id=? AND entry_date>=? AND entry_date<=? {_EXCL}""",
                     (user_id, week_start.isoformat(), week_end.isoformat()))
         row = _fetchone(cur)
     return float(row["total"]) if row else 0.0
@@ -542,16 +726,15 @@ def get_sales_for_week(user_id: int, week_start: date, week_end: date) -> float:
 def get_sales_for_day(user_id: int, day: date) -> float:
     with get_conn() as conn:
         cur = _exec(conn,
-                    """SELECT COALESCE(SUM(units_sold),0) as total FROM sales_entries
-                       WHERE user_id=? AND entry_date=?""",
+                    f"""SELECT COALESCE(SUM(units_sold),0) as total FROM sales_entries
+                       WHERE user_id=? AND entry_date=? {_EXCL}""",
                     (user_id, day.isoformat()))
         row = _fetchone(cur)
     return float(row["total"]) if row else 0.0
 
 
-# ────────────────────────────────────────────────────────────────────────────
-#  PRODUCTIVITY CALCULATIONS
-# ────────────────────────────────────────────────────────────────────────────
+# Estatus excluidos de TODOS los conteos y sumas de ventas
+_EXCL = "AND COALESCE(status,'pendiente') NOT IN ('cancelado','devolucion')"
 
 def _pct(actual: float, target: float) -> float:
     if not target:
@@ -694,7 +877,7 @@ def get_all_entries_for_month(year: int, month: int,
                                    u.associate_number, u.name, u.tienda
                             FROM sales_entries se
                             JOIN users u ON u.id = se.user_id
-                            WHERE {yf} AND {mf} AND u.tienda IN ({ph})
+                            WHERE {yf} AND {mf} AND u.tienda IN ({ph}) {_EXCL}
                             ORDER BY u.name, se.entry_date, se.id""",
                         (str(year), f"{month:02d}", *tiendas_filter))
         else:
@@ -705,10 +888,457 @@ def get_all_entries_for_month(year: int, month: int,
                                    u.associate_number, u.name, u.tienda
                             FROM sales_entries se
                             JOIN users u ON u.id = se.user_id
-                            WHERE {yf} AND {mf}
+                            WHERE {yf} AND {mf} {_EXCL}
                             ORDER BY u.name, se.entry_date, se.id""",
                         (str(year), f"{month:02d}"))
         rows = _fetchall(cur)
     for r in rows:
         r["entry_date"] = str(r["entry_date"])
     return rows
+
+
+# ────────────────────────────────────────────────────────────────────────────
+#  EDICIÓN DE ENTRADAS
+# ────────────────────────────────────────────────────────────────────────────
+
+def get_sales_entry(entry_id: int, user_id: int) -> dict | None:
+    """Obtiene un registro de venta específico del usuario."""
+    with get_conn() as conn:
+        cur = _exec(conn,
+                    """SELECT id, entry_date, units_sold, units_gana_plus, units_kiosko
+                       FROM sales_entries WHERE id=? AND user_id=?""",
+                    (entry_id, user_id))
+        row = _fetchone(cur)
+    if row:
+        row["entry_date"] = str(row["entry_date"])
+    return row
+
+
+def update_sales_entry(entry_id: int, user_id: int,
+                       gana_plus: float, kiosko: float) -> bool:
+    """Actualiza Gana+ y Kiosco de un registro. Solo el dueño puede modificarlo."""
+    total = round(gana_plus + kiosko, 2)
+    with get_conn() as conn:
+        cur = _exec(conn,
+                    """UPDATE sales_entries
+                       SET units_gana_plus=?, units_kiosko=?, units_sold=?
+                       WHERE id=? AND user_id=?""",
+                    (gana_plus, kiosko, total, entry_id, user_id))
+        return cur.rowcount > 0
+
+
+def get_all_sales_entries(user_id: int) -> list:
+    """Retorna todas las entradas de venta de un usuario (para retro-monedas)."""
+    with get_conn() as conn:
+        cur = _exec(conn,
+                    """SELECT id, units_gana_plus, units_kiosko
+                       FROM sales_entries WHERE user_id=?""",
+                    (user_id,))
+        return _fetchall(cur)
+
+
+# ────────────────────────────────────────────────────────────────────────────
+#  MATRIZ ADMIN (vista tipo Excel)
+# ────────────────────────────────────────────────────────────────────────────
+
+def get_team_matrix(year: int, month: int,
+                    tiendas_filter: list | None = None) -> dict:
+    """Retorna datos en formato de matriz: miembros x dias con Gana+/Kiosco."""
+    today         = date.today()
+    days_in_month = calendar.monthrange(year, month)[1]
+    last_day      = today.day if (year == today.year and month == today.month) \
+                    else days_in_month
+    day_range     = list(range(1, last_day + 1))
+
+    all_entries = get_all_entries_for_month(year, month,
+                                            tiendas_filter=tiendas_filter)
+
+    # Mapa: associate_number -> {day_num: {gana_plus, kiosko}}
+    entry_map: dict[str, dict[int, dict]] = {}
+    for e in all_entries:
+        assoc   = e["associate_number"]
+        day_num = int(str(e["entry_date"]).split("-")[2])
+        entry_map.setdefault(assoc, {}).setdefault(
+            day_num, {"gana_plus": 0.0, "kiosko": 0.0}
+        )
+        entry_map[assoc][day_num]["gana_plus"] += float(e.get("units_gana_plus") or 0)
+        entry_map[assoc][day_num]["kiosko"]    += float(e.get("units_kiosko")    or 0)
+
+    members = []
+    for u in get_all_users(tiendas_filter=tiendas_filter):
+        assoc        = u["associate_number"]
+        days         = entry_map.get(assoc, {})
+        total_gana   = sum(d["gana_plus"] for d in days.values())
+        total_kiosko = sum(d["kiosko"]    for d in days.values())
+        members.append({
+            "name":             u["name"],
+            "associate_number": assoc,
+            "tienda":           u["tienda"],
+            "total_gana":       total_gana,
+            "total_kiosko":     total_kiosko,
+            "days":             days,
+        })
+
+    return {
+        "members":   sorted(members, key=lambda x: x["name"].casefold()),
+        "day_range": day_range,
+    }
+
+
+# ────────────────────────────────────────────────────────────────────────────
+#  PEDIDOS OMNICANAL
+# ────────────────────────────────────────────────────────────────────────────
+
+ORDER_STATUSES = ["Pendiente", "Embarcado", "Entregado", "Cancelado", "Devolucion", "Pagado"]
+ORDER_TYPES    = ["KIOSCO", "GANA+"]
+IVA            = 0.16
+
+
+def _init_orders_table(conn) -> None:
+    """Crea la tabla orders si no existe."""
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS orders (
+            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id         INTEGER NOT NULL,
+            tienda          TEXT    NOT NULL,
+            order_number    TEXT    NOT NULL,
+            amount_pesos    REAL    NOT NULL,
+            amount_sin_iva  REAL    NOT NULL,
+            sale_date       TEXT    NOT NULL,
+            type            TEXT    NOT NULL,
+            status          TEXT    NOT NULL DEFAULT 'Pendiente',
+            created_at      TEXT    NOT NULL DEFAULT (datetime('now'))
+        )
+    """)
+    conn.commit()
+
+
+def _ensure_orders_table() -> None:
+    """Garantiza que la tabla orders exista en SQLite."""
+    if not _USE_PG:
+        with get_conn() as conn:
+            _init_orders_table(conn)
+
+
+_ensure_orders_table()
+
+
+def order_number_exists(order_number: str) -> bool:
+    with get_conn() as conn:
+        cur = _exec(conn, "SELECT id FROM orders WHERE order_number=?", (order_number,))
+        return _fetchone(cur) is not None
+
+
+def create_order(user_id: int, tienda: str, order_number: str,
+                 amount_pesos: float, sale_date: str, order_type: str) -> int:
+    """Inserta un pedido nuevo. Retorna el id."""
+    sin_iva = round(amount_pesos / (1 + IVA), 2)
+    with get_conn() as conn:
+        cur = conn.execute(
+            """INSERT INTO orders
+               (user_id, tienda, order_number, amount_pesos, amount_sin_iva, sale_date, type)
+               VALUES (?,?,?,?,?,?,?)""",
+            (user_id, tienda, order_number, amount_pesos, sin_iva, sale_date, order_type),
+        )
+        return cur.lastrowid
+
+
+def get_orders_by_user_month(user_id: int, year: int, month: int) -> list:
+    """Pedidos de UN asociado en un mes."""
+    prefix = f"{year}-{month:02d}"
+    with get_conn() as conn:
+        cur = _exec(conn,
+                    """SELECT o.*, u.name as associate_name, u.associate_number
+                       FROM orders o JOIN users u ON o.user_id = u.id
+                       WHERE o.user_id=? AND o.sale_date LIKE ?
+                       ORDER BY o.sale_date DESC, o.id DESC""",
+                    (user_id, f"{prefix}%"))
+        return _fetchall(cur)
+
+
+def get_orders_summary_month(tienda: str, year: int, month: int) -> dict:
+    """Resumen de pedidos de UNA tienda en un mes (para review panel)."""
+    prefix = f"{year}-{month:02d}"
+    with get_conn() as conn:
+        # Todos los pedidos de la tienda
+        cur = _exec(conn,
+                    """SELECT o.*, u.name as associate_name, u.associate_number
+                       FROM orders o JOIN users u ON o.user_id = u.id
+                       WHERE o.tienda=? AND o.sale_date LIKE ?
+                       ORDER BY o.sale_date DESC, o.id DESC""",
+                    (tienda, f"{prefix}%"))
+        orders = _fetchall(cur)
+
+        # Meta de la tienda
+        cur2 = _exec(conn,
+                     "SELECT goal FROM store_goals WHERE tienda=? AND year=? AND month=?",
+                     (tienda, year, month))
+        goal_row = _fetchone(cur2)
+        goal = float(goal_row["goal"]) if goal_row else 0.0
+
+    total_pesos   = sum(float(o["amount_pesos"])   for o in orders)
+    total_sin_iva = sum(float(o["amount_sin_iva"]) for o in orders)
+    kiosco_pesos  = sum(float(o["amount_pesos"]) for o in orders if o["type"] == "KIOSCO")
+    gana_pesos    = sum(float(o["amount_pesos"]) for o in orders if o["type"] == "GANA+")
+    alcance       = round(total_pesos / goal * 100, 1) if goal > 0 else 0
+
+    # Agrupado por asociado
+    assoc_map: dict = {}
+    for o in orders:
+        k = o["associate_number"]
+        assoc_map.setdefault(k, {
+            "name": o["associate_name"], "associate_number": k,
+            "orders": 0, "pesos": 0.0, "sin_iva": 0.0,
+            "kiosco": 0.0, "gana": 0.0,
+        })
+        assoc_map[k]["orders"] += 1
+        assoc_map[k]["pesos"]  += float(o["amount_pesos"])
+        assoc_map[k]["sin_iva"] += float(o["amount_sin_iva"])
+        if o["type"] == "KIOSCO":
+            assoc_map[k]["kiosco"] += float(o["amount_pesos"])
+        else:
+            assoc_map[k]["gana"]   += float(o["amount_pesos"])
+
+    return {
+        "orders":       orders,
+        "associates":   sorted(assoc_map.values(), key=lambda x: x["pesos"], reverse=True),
+        "total_orders": len(orders),
+        "total_pesos":  total_pesos,
+        "total_sin_iva": total_sin_iva,
+        "kiosco_pesos": kiosco_pesos,
+        "gana_pesos":   gana_pesos,
+        "goal":         goal,
+        "alcance":      alcance,
+    }
+
+
+def update_order_status(order_id: int, user_id: int, new_status: str) -> bool:
+    """Cambia el estatus de un pedido. Solo el dueno puede modificarlo."""
+    with get_conn() as conn:
+        cur = _exec(conn,
+                    "UPDATE orders SET status=? WHERE id=? AND user_id=?",
+                    (new_status, order_id, user_id))
+        return cur.rowcount > 0
+
+
+# ────────────────────────────────────────────────────────────────────────────
+#  CONCENTRADO DE VENTAS POR TIENDA
+# ────────────────────────────────────────────────────────────────────────────
+
+def get_concentrado_tienda(tienda: str, year: int, month: int) -> dict:
+    """
+    Retorna todos los pedidos del mes para una tienda, agrupados por asociado.
+    Incluye: lista plana de entradas, resumen por asociado, totales generales.
+    Cada asociado incluye montos por canal (Gana+/Kiosko), total monto,
+    alcance sobre su meta individual y alcance sobre el total de la tienda.
+    """
+    prefix = f"{year}-{month:02d}"
+
+    with get_conn() as conn:
+        cur = _exec(conn,
+                    """SELECT s.id, s.entry_date, s.order_number,
+                              s.units_sold, s.units_gana_plus, s.units_kiosko,
+                              s.status, s.amount_sin_iva,
+                              s.almacen, s.descripcion,
+                              u.name AS associate_name,
+                              u.associate_number
+                       FROM sales_entries s
+                       JOIN users u ON s.user_id = u.id
+                       WHERE u.tienda = ?
+                         AND s.entry_date LIKE ?
+                       ORDER BY s.entry_date DESC, u.name, s.id DESC""",
+                    (tienda, f"{prefix}%"))
+        entries = _fetchall(cur)
+
+        # Metas individuales de todos los asesores de la tienda para este mes
+        cur2 = _exec(conn,
+                     """SELECT u.associate_number, um.meta_tienda, um.plantilla
+                        FROM user_meta um
+                        JOIN users u ON um.user_id = u.id
+                        WHERE u.tienda = ? AND um.year = ? AND um.month = ?""",
+                     (tienda, year, month))
+        meta_rows = _fetchall(cur2)
+
+    meta_map = {r["associate_number"]: r for r in meta_rows}
+
+    for e in entries:
+        e["entry_date"] = str(e["entry_date"])
+        e["amount_sin_iva"] = float(e["amount_sin_iva"] or 0)
+
+    _NO_CUENTA = {"cancelado", "devolucion"}
+
+    # Resumen por asociado — solo pedidos activos (excluye cancelado/devolucion)
+    assoc_map: dict = {}
+    for e in entries:
+        k = e["associate_number"]
+        # El asesor aparece en el mapa aunque todos sus pedidos sean cancelados
+        assoc_map.setdefault(k, {
+            "name":             e["associate_name"],
+            "associate_number": k,
+            "total":        0,
+            "gana":         0,
+            "kiosko":       0,
+            "monto_gana":   0.0,
+            "monto_kiosko": 0.0,
+            "monto_total":  0.0,
+        })
+        # Cancelado / devolucion: no suman en ninguna cifra
+        if (e["status"] or "pendiente") in _NO_CUENTA:
+            continue
+
+        units_gana   = int(e["units_gana_plus"] or 0)
+        units_kiosko = int(e["units_kiosko"]    or 0)
+        monto        = float(e["amount_sin_iva"] or 0)
+
+        assoc_map[k]["total"]       += int(e["units_sold"] or 0)
+        assoc_map[k]["gana"]        += units_gana
+        assoc_map[k]["kiosko"]      += units_kiosko
+        assoc_map[k]["monto_total"] += monto
+        if units_gana > 0:
+            assoc_map[k]["monto_gana"]   += monto
+        elif units_kiosko > 0:
+            assoc_map[k]["monto_kiosko"] += monto
+
+    associates = sorted(assoc_map.values(), key=lambda x: x["total"], reverse=True)
+
+    total_general = sum(a["total"]       for a in associates)
+    total_gana    = sum(a["gana"]        for a in associates)
+    total_kiosko  = sum(a["kiosko"]      for a in associates)
+    total_monto   = sum(a["monto_total"] for a in associates)
+
+    # Alcances por asesor
+    for a in associates:
+        meta = meta_map.get(a["associate_number"])
+        if meta and meta.get("meta_tienda") and meta.get("plantilla"):
+            # objetivo = meta_tienda / plantilla  (en pesos, igual que en Mi Productividad)
+            objetivo = meta["meta_tienda"] / max(int(meta["plantilla"]), 1)
+            a["meta_objetivo"] = round(objetivo, 2)
+            a["meta_pct"] = round(a["monto_total"] / objetivo * 100, 1) if objetivo > 0 else None
+        else:
+            a["meta_objetivo"] = None
+            a["meta_pct"] = None
+        # % del monto total de la tienda que aporta este asesor
+        a["pct_tienda"] = round(a["monto_total"] / total_monto * 100, 1) if total_monto > 0 else 0.0
+
+    return {
+        "entries":       entries,
+        "associates":    associates,
+        "total_general": total_general,
+        "total_gana":    total_gana,
+        "total_kiosko":  total_kiosko,
+        "total_monto":   total_monto,
+    }
+
+
+def get_entry_by_tienda(entry_id: int, tienda: str) -> dict | None:
+    """Retorna una entrada si pertenece a la tienda. Incluye user_id y canal."""
+    with get_conn() as conn:
+        cur = _exec(conn,
+                    """SELECT s.id, s.status, s.units_gana_plus, s.units_kiosko,
+                              s.user_id
+                       FROM sales_entries s
+                       JOIN users u ON s.user_id = u.id
+                       WHERE s.id = ? AND u.tienda = ?""",
+                    (entry_id, tienda))
+        return _fetchone(cur)
+
+
+def update_entry_status(entry_id: int, tienda: str, new_status: str) -> bool:
+    """Cambia el status de un pedido. Solo si pertenece a la tienda."""
+    allowed = {"pendiente", "embarcado", "entregado", "cancelado", "devolucion", "pagado"}
+    if new_status not in allowed:
+        return False
+    with get_conn() as conn:
+        cur = _exec(conn,
+                    """UPDATE sales_entries SET status=?
+                       WHERE id=?
+                         AND user_id IN (SELECT id FROM users WHERE tienda=?)""",
+                    (new_status, entry_id, tienda))
+        return cur.rowcount > 0
+
+
+def get_sales_entry_by_owner(entry_id: int, user_id: int) -> dict | None:
+    """Retorna una entrada solo si pertenece al usuario."""
+    with get_conn() as conn:
+        cur = _exec(conn,
+                    "SELECT * FROM sales_entries WHERE id=? AND user_id=?",
+                    (entry_id, user_id))
+        return _fetchone(cur)
+
+
+def update_entry_order_and_amount(entry_id: int, user_id: int,
+                                   order_number: str, amount_sin_iva: float) -> bool:
+    """Corrige numero de pedido y monto de una entrada propia."""
+    num = order_number.strip() or None
+    with get_conn() as conn:
+        cur = _exec(conn,
+                    """UPDATE sales_entries
+                       SET order_number=?, amount_sin_iva=?
+                       WHERE id=? AND user_id=?""",
+                    (num, amount_sin_iva, entry_id, user_id))
+        return cur.rowcount > 0
+
+
+# ── MENSAJES MOTIVADORES ───────────────────────────────────────────────────
+
+_MENSAJES = [
+    # (min_pct, max_pct, mensaje, color_css)
+    (  0,  14, "Cada pedido es un paso adelante. Arranca con todo!",           "blue"   ),
+    ( 15,  29, "Buen arranque! Ya llevas el 15%. El ritmo es clave.",           "blue"   ),
+    ( 30,  44, "30% completado. Vas bien encaminado, no bajes el ritmo!",      "green"  ),
+    ( 45,  59, "Ya estas a mitad del camino. La constancia gana siempre!",     "green"  ),
+    ( 60,  74, "60% logrado! La meta ya se ve, sigue empujando!",              "yellow" ),
+    ( 75,  89, "75% del objetivo! Ultimo tramo, dale con todo!",               "yellow" ),
+    ( 90,  99, "Casi lista! A un empujon de alcanzar tu meta del mes!",        "orange" ),
+    (100, 114, "META CUMPLIDA! Excelente trabajo este mes!",                   "walmart" ),
+    (115, 129, "115% de la meta! Eres una maquina de ventas!",                "walmart" ),
+    (130, 999, "Mas del 130%! Nivel leyenda desbloqueado. Increible!",         "purple" ),
+]
+
+_HITOS = [0, 15, 30, 45, 60, 75, 90, 100, 115, 130]
+
+
+def get_motivational_message(user_id: int, year: int, month: int) -> dict | None:
+    """
+    Retorna el mensaje motivador correspondiente al % de avance
+    a la meta individual. Retorna None si no hay meta configurada.
+    """
+    meta = get_user_meta(user_id, year, month)
+    if not meta or not meta.get("meta_tienda") or not meta.get("plantilla"):
+        return None
+
+    objetivo_individual = meta["meta_tienda"] / meta["plantilla"]
+    if objetivo_individual <= 0:
+        return None
+
+    # Total pedidos del mes
+    prefix = f"{year}-{month:02d}"
+    with get_conn() as conn:
+        cur = _exec(conn,
+                    f"SELECT COUNT(*) AS n FROM sales_entries "
+                    f"WHERE user_id=? AND entry_date LIKE ? {_EXCL}",
+                    (user_id, f"{prefix}%"))
+        row   = _fetchone(cur)
+        total = int(row["n"] if row else 0)
+
+    pct = (total / objetivo_individual) * 100
+
+    msg_row = _MENSAJES[0]
+    for m in _MENSAJES:
+        if pct >= m[0]:
+            msg_row = m
+
+    # Hito actual (multiplo de 15 alcanzado)
+    hito = 0
+    for h in _HITOS:
+        if pct >= h:
+            hito = h
+
+    return {
+        "pct":       round(pct, 1),
+        "total":     total,
+        "objetivo":  round(objetivo_individual, 1),
+        "mensaje":   msg_row[2],
+        "color":     msg_row[3],
+        "hito":      hito,
+    }
