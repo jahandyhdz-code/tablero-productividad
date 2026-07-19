@@ -1,0 +1,1 @@
+.venv\Scripts\python.exe: can't open file 'C:\\Users\\j0h162q\\Documents\\puppy_workspace\\ventas_productividad_dev\\test_conc.py': [Errno 2] No such file or directory
