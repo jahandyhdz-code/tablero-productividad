@@ -2,18 +2,6 @@
 from datetime import datetime, timezone
 from database import get_conn, _exec, _fetchone, _fetchall, _USE_PG
 
-
-def _ensure_hunger_column() -> None:
-    """Migra la columna hunger_updated_at si no existe."""
-    try:
-        with get_conn() as conn:
-            conn.execute("ALTER TABLE pets ADD COLUMN hunger_updated_at TEXT")
-    except Exception:
-        pass  # Ya existe, todo bien
-
-
-_ensure_hunger_column()
-
 # ────────────────────────────────────────────────────────────────────────────
 #  MASCOTAS (TAMAGOTCHI)
 # ────────────────────────────────────────────────────────────────────────────
