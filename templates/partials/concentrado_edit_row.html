@@ -1,0 +1,68 @@
+<!-- concentrado_edit_row.html — fila en modo edicion, SIN form wrapper ni script tag -->
+<tr id="conc-row-{{ e.id }}" class="border-t border-walmart/30 bg-walmart/5">
+
+  <!-- Fecha -->
+  <td class="px-4 py-3 text-gray-500 text-xs whitespace-nowrap">{{ e.entry_date }}</td>
+
+  <!-- Asesor -->
+  <td class="px-4 py-3">
+    <span class="text-xs text-gray-400 italic">Tu registro</span>
+  </td>
+
+  <!-- No. Pedido editable -->
+  <td class="px-4 py-3">
+    <input id="edit-num-{{ e.id }}"
+           type="text" inputmode="numeric" maxlength="15"
+           value="{{ e.order_number or '' }}"
+           placeholder="13 o 15 digitos"
+           class="w-36 border border-walmart rounded-lg px-2 py-1 text-xs font-mono
+                  focus:ring-2 focus:ring-walmart focus:outline-none tracking-wide" />
+  </td>
+
+  <!-- Tipo -->
+  <td class="px-4 py-3 text-center">
+    {% if e.units_gana_plus and e.units_gana_plus > 0 %}
+      <span class="text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-full">Gana+</span>
+    {% elif e.units_kiosko and e.units_kiosko > 0 %}
+      <span class="text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded-full">Kiosko</span>
+    {% else %}
+      <span class="text-gray-300 text-xs">--</span>
+    {% endif %}
+  </td>
+
+  <!-- Estatus -->
+  <td class="px-4 py-3 text-center">
+    <span class="text-xs text-gray-400">--</span>
+  </td>
+
+  <!-- Monto con IVA editable -->
+  <td class="px-4 py-3">
+    <div class="flex items-center gap-1 justify-end">
+      <span class="text-gray-400 text-xs">$</span>
+      <input id="edit-amt-{{ e.id }}"
+             type="number" min="0" step="0.01"
+             value="{{ amount_con_iva }}"
+             placeholder="0.00"
+             class="w-24 border border-walmart rounded-lg px-2 py-1 text-xs text-right
+                    focus:ring-2 focus:ring-walmart focus:outline-none" />
+      <span class="text-[10px] text-gray-400">c/IVA</span>
+    </div>
+  </td>
+
+  <!-- Botones - llaman funciones definidas en concentrado.html -->
+  <td class="px-3 py-3 text-right whitespace-nowrap">
+    <button type="button"
+            onclick="guardarEdicionConcentrado({{ e.id }}, {{ year }}, {{ month }})"
+            class="text-xs bg-walmart text-white font-bold px-3 py-1 rounded-lg
+                   hover:bg-walmart-dark transition mr-1">
+      Guardar
+    </button>
+    <button type="button"
+            onclick="cancelarEdicion({{ year }}, {{ month }})"
+            class="text-xs text-gray-500 hover:text-gray-700 font-medium px-2 py-1
+                   rounded-lg hover:bg-gray-100 transition">
+      Cancelar
+    </button>
+  </td>
+
+</tr>
