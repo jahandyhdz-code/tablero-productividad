@@ -30,19 +30,23 @@ def _period(request: Request) -> tuple[int, int]:
 
 
 def _render_dashboard(request: Request, user: dict, year: int, month: int):
+    det      = user.get("determinante") or ""
+    pres_t   = db.get_store_budget(det, year, month) if det else 0.0
     metrics  = db.get_productivity_metrics(user["id"], year, month)
     meta_row = db.get_user_meta(user["id"], year, month)
-    individual = round(meta_row["meta_tienda"] / max(meta_row["plantilla"], 1), 1) if meta_row else 0
+    plantilla   = meta_row["plantilla"] if meta_row else 0
+    individual  = round(pres_t / max(plantilla, 1), 1) if pres_t and plantilla else 0
     return templates.TemplateResponse("dashboard.html", {
-        "request":    request,
-        "user":       user,
-        "metrics":    metrics,
-        "year":       year,
-        "month":      month,
-        "today":      date.today().isoformat(),
-        "months_es":  MONTHS_ES,
-        "meta":       meta_row,
-        "individual": individual,
+        "request":           request,
+        "user":              user,
+        "metrics":           metrics,
+        "year":              year,
+        "month":             month,
+        "today":             date.today().isoformat(),
+        "months_es":         MONTHS_ES,
+        "meta":              meta_row,
+        "individual":        individual,
+        "presupuesto_tienda": pres_t,
     })
 
 
@@ -378,21 +382,23 @@ async def update_concentrado_status(
 @router.post("/meta", response_class=HTMLResponse)
 async def set_meta(
     request: Request,
-    meta_tienda: float = Form(...),
-    plantilla:   int   = Form(...),
-    year:        int   = Form(...),
-    month:       int   = Form(...),
+    plantilla: int = Form(...),
+    year:      int = Form(...),
+    month:     int = Form(...),
 ):
     user = auth.get_current_user(request)
     if not user:
         return RedirectResponse("/login", status_code=302)
 
-    individual = db.set_user_meta(user["id"], year, month, meta_tienda, plantilla)
+    # Presupuesto viene de store_budgets (no del form)
+    det    = user.get("determinante") or ""
+    pres_t = db.get_store_budget(det, year, month) if det else 0.0
+
+    individual = db.set_user_meta(user["id"], year, month, pres_t, plantilla)
     metrics    = db.get_productivity_metrics(user["id"], year, month)
     meta_row   = db.get_user_meta(user["id"], year, month)
     motiv      = db.get_motivational_message(user["id"], year, month)
 
-    # Actualiza cards + el panel de meta via OOB
     cards_html = templates.TemplateResponse(
         "partials/productivity_cards.html",
         {"request": request, "metrics": metrics,
@@ -402,7 +408,8 @@ async def set_meta(
     meta_html = templates.TemplateResponse(
         "partials/meta_panel.html",
         {"request": request, "meta": meta_row,
-         "individual": individual, "year": year, "month": month},
+         "individual": individual, "year": year, "month": month,
+         "presupuesto_tienda": pres_t},
     ).body.decode()
     meta_oob = meta_html.replace(
         'id="meta-panel"', 'id="meta-panel" hx-swap-oob="outerHTML"', 1
