@@ -114,8 +114,10 @@ async def pet_home(request: Request):
     log   = pets.get_pet_log(pet["id"], limit=8)
 
     # Top 3 ranking de la tienda para mostrar en la pagina
-    tienda  = user.get("tienda", "")
-    ranking = pets.get_ranking_by_tienda(tienda)[:3]
+    from datetime import date as _date
+    _hoy = _date.today()
+    det     = user.get("determinante") or ""
+    ranking = pets.get_ranking_by_tienda(det, _hoy.year, _hoy.month)[:3]
     for i, r in enumerate(ranking):
         r["rank"]    = i + 1
         r["is_mine"] = (r["user_id"] == user["id"])
@@ -194,7 +196,7 @@ async def use_item(request: Request, item_type: str):
     })
 
 
-# ── RANKING ────────────────────────────────────────────────────────────────────────
+# ── RANKING ──────────────────────────────────────────────────────
 
 @router.get("/ranking", response_class=HTMLResponse)
 async def pet_ranking(request: Request):
@@ -202,17 +204,23 @@ async def pet_ranking(request: Request):
     if redir:
         return redir
 
-    tienda   = user.get("tienda", "")
-    ranking  = pets.get_ranking_by_tienda(tienda)
-    my_pet   = pets.get_pet_by_user(user["id"])
+    from datetime import date as _date
+    today = _date.today()
+    year  = int(request.query_params.get("year",  today.year))
+    month = int(request.query_params.get("month", today.month))
+
+    det    = user.get("determinante") or ""
+    tienda = user.get("tienda", "")
+    ranking = pets.get_ranking_by_tienda(det, year, month)
+    my_pet  = pets.get_pet_by_user(user["id"])
 
     # Enriquecer con art SVG y emocion
     for i, r in enumerate(ranking):
-        r["rank"]      = i + 1
-        r["pet_svg"]   = pet_art.get_art(r["animal_type"], r["stage"])
-        r["emotion"]   = pets.get_pet_emotion(r)
-        r["emeta"]     = pets.get_emotion_meta(r["emotion"])
-        r["is_mine"]   = (r["user_id"] == user["id"])
+        r["rank"]    = i + 1
+        r["pet_svg"] = pet_art.get_art(r["animal_type"], r["stage"])
+        r["emotion"] = pets.get_pet_emotion(r)
+        r["emeta"]   = pets.get_emotion_meta(r["emotion"])
+        r["is_mine"] = (r["user_id"] == user["id"])
 
     return templates.TemplateResponse("pet_ranking.html", {
         "request": request,
@@ -220,6 +228,8 @@ async def pet_ranking(request: Request):
         "ranking": ranking,
         "my_pet":  my_pet,
         "tienda":  tienda,
+        "year":    year,
+        "month":   month,
     })
 
 
