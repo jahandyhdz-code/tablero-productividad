@@ -152,7 +152,10 @@ def _sqlite_init(conn):
         tienda               TEXT    NOT NULL DEFAULT '',
         must_change_password INTEGER NOT NULL DEFAULT 1,
         admin_tiendas        TEXT    DEFAULT NULL,
-        created_at           TEXT    NOT NULL DEFAULT (datetime('now'))
+        created_at           TEXT    NOT NULL DEFAULT (datetime('now')),
+        determinante         TEXT    NOT NULL DEFAULT '',
+        squad                TEXT    NOT NULL DEFAULT '',
+        distrito             TEXT    NOT NULL DEFAULT ''
     );
     CREATE TABLE IF NOT EXISTS sales_targets (
         id           INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -221,6 +224,24 @@ def _sqlite_init(conn):
         xp_won     INTEGER NOT NULL DEFAULT 0,
         result     TEXT
     );
+    CREATE TABLE IF NOT EXISTS store_budgets (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        determinante TEXT   NOT NULL DEFAULT '',
+        tienda      TEXT    NOT NULL,
+        year        INTEGER NOT NULL,
+        month       INTEGER NOT NULL,
+        presupuesto REAL    NOT NULL,
+        UNIQUE (determinante, year, month)
+    );
+    CREATE TABLE IF NOT EXISTS store_daily_budgets (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        determinante TEXT   NOT NULL,
+        year        INTEGER NOT NULL,
+        month       INTEGER NOT NULL,
+        day         INTEGER NOT NULL,
+        presupuesto REAL    NOT NULL,
+        UNIQUE (determinante, year, month, day)
+    );
     """)
 
 
@@ -235,8 +256,11 @@ def _pg_init(conn):
         role                 TEXT   NOT NULL DEFAULT 'user',
         tienda               TEXT   NOT NULL DEFAULT '',
         must_change_password INTEGER NOT NULL DEFAULT 1,
-        admin_tiendas        TEXT   DEFAULT NULL,
-        created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        admin_tiendas      TEXT   DEFAULT NULL,
+        created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        determinante         TEXT   NOT NULL DEFAULT '',
+        squad                TEXT   NOT NULL DEFAULT '',
+        distrito             TEXT   NOT NULL DEFAULT ''
     );
     CREATE TABLE IF NOT EXISTS sales_targets (
         id           SERIAL PRIMARY KEY,
@@ -341,6 +365,9 @@ def run_migrations():
     _add_col_if_missing("users", "tienda",               "TEXT NOT NULL DEFAULT ''")
     _add_col_if_missing("users", "must_change_password",  "INTEGER NOT NULL DEFAULT 0")
     _add_col_if_missing("users", "admin_tiendas",         "TEXT DEFAULT NULL")
+    _add_col_if_missing("users", "determinante",          "TEXT NOT NULL DEFAULT ''")
+    _add_col_if_missing("users", "squad",                 "TEXT NOT NULL DEFAULT ''")
+    _add_col_if_missing("users", "distrito",              "TEXT NOT NULL DEFAULT ''")
     _add_col_if_missing("sales_entries", "units_gana_plus",  "REAL NOT NULL DEFAULT 0")
     _add_col_if_missing("sales_entries", "units_kiosko",     "REAL NOT NULL DEFAULT 0")
     _add_col_if_missing("sales_entries", "order_number",     "TEXT")
@@ -355,6 +382,54 @@ def run_migrations():
     _add_col_if_missing("pets", "hunger_updated_at",
                         "TIMESTAMPTZ NOT NULL DEFAULT NOW()" if _USE_PG
                         else "TEXT NOT NULL DEFAULT (datetime('now'))")
+    # Presupuestos por tienda (carga masiva via Excel)
+    with get_conn() as conn:
+        if _USE_PG:
+            conn.cursor().execute("""
+                CREATE TABLE IF NOT EXISTS store_budgets (
+                    id          SERIAL PRIMARY KEY,
+                    determinante TEXT NOT NULL DEFAULT '',
+                    tienda      TEXT    NOT NULL,
+                    year        INTEGER NOT NULL,
+                    month       INTEGER NOT NULL,
+                    presupuesto REAL    NOT NULL,
+                    UNIQUE (determinante, year, month)
+                )""")
+            conn.cursor().execute("""
+                CREATE TABLE IF NOT EXISTS store_daily_budgets (
+                    id          SERIAL PRIMARY KEY,
+                    determinante TEXT NOT NULL,
+                    year        INTEGER NOT NULL,
+                    month       INTEGER NOT NULL,
+                    day         INTEGER NOT NULL,
+                    presupuesto REAL    NOT NULL,
+                    UNIQUE (determinante, year, month, day)
+                )""")
+        else:
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS store_budgets (
+                    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                    determinante TEXT NOT NULL DEFAULT '',
+                    tienda      TEXT    NOT NULL,
+                    year        INTEGER NOT NULL,
+                    month       INTEGER NOT NULL,
+                    presupuesto REAL    NOT NULL,
+                    UNIQUE (determinante, year, month)
+                )""")
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS store_daily_budgets (
+                    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                    determinante TEXT NOT NULL,
+                    year        INTEGER NOT NULL,
+                    month       INTEGER NOT NULL,
+                    day         INTEGER NOT NULL,
+                    presupuesto REAL    NOT NULL,
+                    UNIQUE (determinante, year, month, day)
+                )""")
+    # Columna determinante en users (para ligar al asesor con su tienda)
+    _add_col_if_missing("users", "determinante", "TEXT NOT NULL DEFAULT ''")
+    # Columna determinante en store_budgets (puede existir sin ella en DBs viejas)
+    _add_col_if_missing("store_budgets", "determinante", "TEXT NOT NULL DEFAULT ''")
 
 
 # ────────────────────────────────────────────────────────────────────────────
@@ -461,6 +536,24 @@ def update_user_password(user_id: int, password_hash: str, clear_force: bool = F
                   (password_hash, user_id))
 
 
+def update_user_determinante(user_id: int, determinante: str):
+    """Guarda el determinante de tienda del usuario."""
+    ph = "%s" if _USE_PG else "?"
+    with get_conn() as conn:
+        _exec(conn,
+              f"UPDATE users SET determinante={ph} WHERE id={ph}",
+              (determinante, user_id))
+
+
+def update_user_squad_distrito(user_id: int, squad: str, distrito: str):
+    """Guarda squad y distrito del usuario."""
+    ph = "%s" if _USE_PG else "?"
+    with get_conn() as conn:
+        _exec(conn,
+              f"UPDATE users SET squad={ph}, distrito={ph} WHERE id={ph}",
+              (squad.strip(), distrito.strip(), user_id))
+
+
 def associate_number_exists(associate_number: str) -> bool:
     with get_conn() as conn:
         cur = _exec(conn,
@@ -471,11 +564,24 @@ def associate_number_exists(associate_number: str) -> bool:
 
 def delete_user(user_id: int) -> None:
     with get_conn() as conn:
+        # Tablas que apuntan a pets por FK pet_id
+        _exec(conn, """
+            DELETE FROM pet_items WHERE pet_id IN
+            (SELECT id FROM pets WHERE user_id = ?)""", (user_id,))
+        _exec(conn, """
+            DELETE FROM pet_actions_log WHERE pet_id IN
+            (SELECT id FROM pets WHERE user_id = ?)""", (user_id,))
+        # Tablas con FK directo a user_id
+        _exec(conn, "DELETE FROM pets          WHERE user_id = ?", (user_id,))
+        _exec(conn, "DELETE FROM user_meta     WHERE user_id = ?", (user_id,))
+        _exec(conn, "DELETE FROM game_plays    WHERE user_id = ?", (user_id,))
+        _exec(conn, "DELETE FROM orders        WHERE user_id = ?", (user_id,))
         _exec(conn, "DELETE FROM sessions      WHERE user_id = ?", (user_id,))
         _exec(conn, "DELETE FROM rest_days     WHERE user_id = ?", (user_id,))
         _exec(conn, "DELETE FROM sales_entries WHERE user_id = ?", (user_id,))
         _exec(conn, "DELETE FROM sales_targets WHERE user_id = ?", (user_id,))
-        _exec(conn, "DELETE FROM users          WHERE id      = ?", (user_id,))
+        # Por ultimo el usuario
+        _exec(conn, "DELETE FROM users         WHERE id      = ?", (user_id,))
 
 
 # ────────────────────────────────────────────────────────────────────────────
@@ -759,17 +865,20 @@ def commercial_week(ref: date) -> tuple[date, date]:
     return week_start, week_end
 
 
+# Meta fija de pedidos por día laborable
+_PEDIDOS_POR_DIA = 6
+
+
 def get_productivity_metrics(user_id: int, year: int, month: int) -> dict:
     today = date.today()
     days_in_month  = calendar.monthrange(year, month)[1]
-    monthly_target = get_sales_target(user_id, year, month) or 0.0
 
     rest_days = get_rest_days_for_month(user_id, year, month)
     working_days_month = max(days_in_month - len(rest_days), 1)
-    daily_target = monthly_target / working_days_month if monthly_target else 0.0
 
+    # Meta de PEDIDOS: 6 fijos por día laborable
     today_is_rest = today.isoformat() in rest_days
-    today_target  = 0.0 if today_is_rest else daily_target
+    today_target  = 0 if today_is_rest else _PEDIDOS_POR_DIA
 
     week_start, week_end = commercial_week(today)
     working_days_week = sum(
@@ -777,13 +886,25 @@ def get_productivity_metrics(user_id: int, year: int, month: int) -> dict:
         if (week_start + timedelta(days=i)).month == month
         and (week_start + timedelta(days=i)).isoformat() not in rest_days
     )
-    weekly_target = daily_target * working_days_week
+    weekly_target  = working_days_week * _PEDIDOS_POR_DIA
+    monthly_target = working_days_month * _PEDIDOS_POR_DIA
 
     monthly_entries = get_sales_for_month(user_id, year, month)
     monthly_actual  = sum(e["units_sold"] for e in monthly_entries)
     weekly_actual   = get_sales_for_week(user_id, week_start, week_end)
     daily_actual    = get_sales_for_day(user_id, today)
     daily_diff      = round(daily_actual - today_target, 1)
+
+    # Productividad diaria: pedidos del mes / dias laborados hasta hoy
+    first_of_month = date(year, month, 1)
+    if year == today.year and month == today.month:
+        last_elapsed = today
+    else:
+        last_elapsed = date(year, month, days_in_month)
+    elapsed_days    = (last_elapsed - first_of_month).days + 1
+    rest_in_elapsed = sum(1 for d in rest_days if d <= last_elapsed.isoformat())
+    dias_laborados  = max(elapsed_days - rest_in_elapsed, 1)
+    prod_diaria     = round(monthly_actual / dias_laborados, 1)
 
     daily_map: dict[str, float] = {}
     for e in monthly_entries:
@@ -795,12 +916,14 @@ def get_productivity_metrics(user_id: int, year: int, month: int) -> dict:
     chart_rest   = [date(year, month, d).isoformat() in rest_days for d in chart_labels]
 
     return {
-        "daily":   {"actual": daily_actual,   "target": round(today_target, 1),
+        "daily":   {"actual": daily_actual,   "target": today_target,
                     "pct": _pct(daily_actual, today_target), "diff": daily_diff},
-        "weekly":  {"actual": weekly_actual,  "target": round(weekly_target, 1),
+        "weekly":  {"actual": weekly_actual,  "target": weekly_target,
                     "pct": _pct(weekly_actual, weekly_target)},
         "monthly": {"actual": monthly_actual, "target": monthly_target,
                     "pct": _pct(monthly_actual, monthly_target)},
+        "prod_diaria":    prod_diaria,
+        "dias_laborados": dias_laborados,
         "chart_labels":  chart_labels,
         "chart_data":    chart_data,
         "chart_rest":    chart_rest,
@@ -808,8 +931,8 @@ def get_productivity_metrics(user_id: int, year: int, month: int) -> dict:
         "first_weekday": date(year, month, 1).weekday(),
         "entries":       monthly_entries,
         "today":         today.isoformat(),
-        "has_target":    monthly_target > 0,
-        "daily_target":  round(daily_target, 1),
+        "has_target":    True,  # Siempre hay meta: 6 pedidos/dia laborable
+        "daily_target":  _PEDIDOS_POR_DIA,
     }
 
 
@@ -877,28 +1000,27 @@ def get_all_entries_for_month(year: int, month: int,
     yf = _year_filter("se.entry_date")
     mf = _month_filter("se.entry_date")
     with get_conn() as conn:
+        base_select = """SELECT se.id, se.entry_date, se.units_sold,
+                                se.units_gana_plus, se.units_kiosko,
+                                se.order_number, se.notes, se.created_at,
+                                u.associate_number, u.name, u.tienda,
+                                u.determinante"""
         if tiendas_filter:
             ph = ",".join(["%s" if _USE_PG else "?"] * len(tiendas_filter))
             cur = _exec(conn,
-                        f"""SELECT se.id, se.entry_date, se.units_sold,
-                                   se.units_gana_plus, se.units_kiosko,
-                                   se.notes, se.created_at,
-                                   u.associate_number, u.name, u.tienda
-                            FROM sales_entries se
-                            JOIN users u ON u.id = se.user_id
-                            WHERE {yf} AND {mf} AND u.tienda IN ({ph}) {_EXCL}
-                            ORDER BY u.name, se.entry_date, se.id""",
+                        f"{base_select}"
+                        f" FROM sales_entries se"
+                        f" JOIN users u ON u.id = se.user_id"
+                        f" WHERE {yf} AND {mf} AND u.tienda IN ({ph}) {_EXCL}"
+                        f" ORDER BY u.name, se.entry_date, se.id",
                         (str(year), f"{month:02d}", *tiendas_filter))
         else:
             cur = _exec(conn,
-                        f"""SELECT se.id, se.entry_date, se.units_sold,
-                                   se.units_gana_plus, se.units_kiosko,
-                                   se.notes, se.created_at,
-                                   u.associate_number, u.name, u.tienda
-                            FROM sales_entries se
-                            JOIN users u ON u.id = se.user_id
-                            WHERE {yf} AND {mf} {_EXCL}
-                            ORDER BY u.name, se.entry_date, se.id""",
+                        f"{base_select}"
+                        f" FROM sales_entries se"
+                        f" JOIN users u ON u.id = se.user_id"
+                        f" WHERE {yf} AND {mf} {_EXCL}"
+                        f" ORDER BY u.name, se.entry_date, se.id",
                         (str(year), f"{month:02d}"))
         rows = _fetchall(cur)
     for r in rows:
@@ -1229,13 +1351,30 @@ def get_concentrado_tienda(tienda: str, year: int, month: int) -> dict:
         # % del monto total de la tienda que aporta este asesor
         a["pct_tienda"] = round(a["monto_total"] / total_monto * 100, 1) if total_monto > 0 else 0.0
 
+    # Presupuesto de tienda: tomamos el primer meta_tienda no nulo del periodo
+    presupuesto_tienda = 0.0
+    plantilla_tienda   = 0
+    for r in meta_rows:
+        if r.get("meta_tienda"):
+            presupuesto_tienda = float(r["meta_tienda"])
+            plantilla_tienda   = int(r.get("plantilla") or 1)
+            break
+
+    alcance_tienda_pct = (
+        round(total_monto / presupuesto_tienda * 100, 1)
+        if presupuesto_tienda > 0 else 0.0
+    )
+
     return {
-        "entries":       entries,
-        "associates":    associates,
-        "total_general": total_general,
-        "total_gana":    total_gana,
-        "total_kiosko":  total_kiosko,
-        "total_monto":   total_monto,
+        "entries":            entries,
+        "associates":         associates,
+        "total_general":      total_general,
+        "total_gana":         total_gana,
+        "total_kiosko":       total_kiosko,
+        "total_monto":        total_monto,
+        "presupuesto_tienda": presupuesto_tienda,
+        "plantilla_tienda":   plantilla_tienda,
+        "alcance_tienda_pct": alcance_tienda_pct,
     }
 
 
@@ -1351,3 +1490,176 @@ def get_motivational_message(user_id: int, year: int, month: int) -> dict | None
         "color":     msg_row[3],
         "hito":      hito,
     }
+
+
+# ────────────────────────────────────────────────────────────────────────────
+#  PRESUPUESTOS POR TIENDA (carga masiva via Excel)
+# ────────────────────────────────────────────────────────────────────────────
+
+def get_store_budget(determinante: str, year: int, month: int) -> float:
+    """Presupuesto mensual en pesos de la tienda por determinante, 0 si no existe."""
+    ph = "%s" if _USE_PG else "?"
+    with get_conn() as conn:
+        cur = _exec(
+            conn,
+            f"SELECT presupuesto FROM store_budgets WHERE determinante={ph} AND year={ph} AND month={ph}",
+            (determinante, year, month),
+        )
+        row = _fetchone(cur)
+        return float(row["presupuesto"]) if row else 0.0
+
+
+def get_store_daily_budget(determinante: str, year: int, month: int, day: int) -> float:
+    """Presupuesto del dia especifico, 0 si no existe."""
+    ph = "%s" if _USE_PG else "?"
+    with get_conn() as conn:
+        cur = _exec(
+            conn,
+            f"SELECT presupuesto FROM store_daily_budgets"
+            f" WHERE determinante={ph} AND year={ph} AND month={ph} AND day={ph}",
+            (determinante, year, month, day),
+        )
+        row = _fetchone(cur)
+        return float(row["presupuesto"]) if row else 0.0
+
+
+def get_store_daily_budgets_month(determinante: str, year: int, month: int) -> dict[int, float]:
+    """Todos los presupuestos diarios del mes. Retorna {dia: presupuesto}."""
+    ph = "%s" if _USE_PG else "?"
+    with get_conn() as conn:
+        cur = _exec(
+            conn,
+            f"SELECT day, presupuesto FROM store_daily_budgets"
+            f" WHERE determinante={ph} AND year={ph} AND month={ph} ORDER BY day",
+            (determinante, year, month),
+        )
+        return {r["day"]: float(r["presupuesto"]) for r in _fetchall(cur)}
+
+
+def upsert_store_budgets(rows: list[dict]) -> int:
+    """
+    Inserta/actualiza presupuestos mensuales y diarios de tiendas.
+    rows = [{determinante, tienda, year, month, presupuesto_mensual,
+             dias: {1: X, 2: Y, ...}}]
+    Retorna cantidad de filas mensuales procesadas.
+    """
+    ph = "%s" if _USE_PG else "?"
+    count = 0
+    with get_conn() as conn:
+        for b in rows:
+            det   = b["determinante"]
+            tiend = b.get("tienda", "")
+            yr    = b["year"]
+            mo    = b["month"]
+            pres  = b["presupuesto"]
+            dias  = b.get("dias", {})
+
+            # Mensual
+            if _USE_PG:
+                _exec(conn,
+                      "INSERT INTO store_budgets (determinante, tienda, year, month, presupuesto)"
+                      " VALUES (%s,%s,%s,%s,%s)"
+                      " ON CONFLICT (determinante, year, month)"
+                      " DO UPDATE SET presupuesto=EXCLUDED.presupuesto, tienda=EXCLUDED.tienda",
+                      (det, tiend, yr, mo, pres))
+            else:
+                _exec(conn,
+                      "INSERT INTO store_budgets (determinante, tienda, year, month, presupuesto)"
+                      " VALUES (?,?,?,?,?)"
+                      " ON CONFLICT (determinante, year, month)"
+                      " DO UPDATE SET presupuesto=excluded.presupuesto, tienda=excluded.tienda",
+                      (det, tiend, yr, mo, pres))
+            count += 1
+
+            # Diarios
+            for day, pres_dia in dias.items():
+                if _USE_PG:
+                    _exec(conn,
+                          "INSERT INTO store_daily_budgets (determinante, year, month, day, presupuesto)"
+                          " VALUES (%s,%s,%s,%s,%s)"
+                          " ON CONFLICT (determinante, year, month, day)"
+                          " DO UPDATE SET presupuesto=EXCLUDED.presupuesto",
+                          (det, yr, mo, int(day), float(pres_dia)))
+                else:
+                    _exec(conn,
+                          "INSERT INTO store_daily_budgets (determinante, year, month, day, presupuesto)"
+                          " VALUES (?,?,?,?,?)"
+                          " ON CONFLICT (determinante, year, month, day)"
+                          " DO UPDATE SET presupuesto=excluded.presupuesto",
+                          (det, yr, mo, int(day), float(pres_dia)))
+    return count
+
+
+def get_all_tiendas() -> list[str]:
+    """Todas las tiendas distintas registradas en users (sin blancos)."""
+    with get_conn() as conn:
+        cur = _exec(
+            conn,
+            "SELECT DISTINCT tienda FROM users WHERE tienda != '' ORDER BY tienda",
+            (),
+        )
+        return [r["tienda"] for r in _fetchall(cur)]
+
+
+def get_all_store_budgets(year: int, month: int) -> list[dict]:
+    """Todos los presupuestos mensuales guardados para un periodo."""
+    ph = "%s" if _USE_PG else "?"
+    with get_conn() as conn:
+        cur = _exec(
+            conn,
+            f"SELECT determinante, tienda, presupuesto FROM store_budgets"
+            f" WHERE year={ph} AND month={ph} ORDER BY tienda",
+            (year, month),
+        )
+        return _fetchall(cur)
+
+
+def get_stats_by_group(year: int, month: int, group_col: str) -> list[dict]:
+    """
+    Estadisticas agrupadas por 'squad' o 'distrito'.
+    Retorna lista ordenada por pedidos desc con:
+      grupo, num_asesores, total_pedidos, total_unidades,
+      presupuesto_total, alcance_pct
+    """
+    assert group_col in ("squad", "distrito"), "grupo invalido"
+    yf = _year_filter("se.entry_date")
+    mf = _month_filter("se.entry_date")
+    ph = "%s" if _USE_PG else "?"
+    with get_conn() as conn:
+        # Ventas del mes agrupadas por el campo del usuario
+        cur = _exec(conn, f"""
+            SELECT u.{group_col}          AS grupo,
+                   COUNT(DISTINCT u.id)   AS num_asesores,
+                   COUNT(se.id)           AS total_pedidos,
+                   COALESCE(SUM(se.units_sold), 0) AS total_unidades
+            FROM users u
+            LEFT JOIN sales_entries se
+                   ON se.user_id = u.id
+                  AND {yf} AND {mf}
+            WHERE u.role = 'user'
+              AND u.{group_col} != ''
+            GROUP BY u.{group_col}
+            ORDER BY total_pedidos DESC
+        """, (str(year), f"{month:02d}"))
+        rows = _fetchall(cur)
+
+    # Para cada grupo sumar los presupuestos de sus determinantes
+    for r in rows:
+        grp = r["grupo"]
+        with get_conn() as conn:
+            cur2 = _exec(conn, f"""
+                SELECT COALESCE(SUM(sb.presupuesto), 0) AS total_pres
+                FROM store_budgets sb
+                WHERE sb.year  = {ph}
+                  AND sb.month = {ph}
+                  AND sb.determinante IN (
+                      SELECT DISTINCT determinante FROM users
+                      WHERE {group_col} = {ph} AND role = 'user'
+                  )
+            """, (year, month, grp))
+            pres = (_fetchone(cur2) or {}).get("total_pres", 0) or 0
+        r["presupuesto_total"] = round(float(pres), 0)
+        r["alcance_pct"] = (
+            round(r["total_unidades"] / pres * 100, 1) if pres > 0 else None
+        )
+    return rows
