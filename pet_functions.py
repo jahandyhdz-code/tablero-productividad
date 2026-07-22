@@ -264,6 +264,8 @@ def get_top_pets_for_team(user_ids: list[int], year: int, month: int,
     from database import _year_filter, _month_filter
     month_str = f"{month:02d}"
     ph_list   = ",".join(["?" if not _USE_PG else "%s"] * len(user_ids))
+    yf = _year_filter("se.entry_date")
+    mf = _month_filter("se.entry_date")
     with get_conn() as conn:
         cur = _exec(conn, f"""
             SELECT p.id, p.pet_name, p.animal_type, p.stage, p.xp, p.coins,
@@ -275,8 +277,7 @@ def get_top_pets_for_team(user_ids: list[int], year: int, month: int,
             LEFT JOIN (
                 SELECT se.user_id, COUNT(*) AS total_pedidos
                 FROM sales_entries se
-                WHERE strftime('%Y', se.entry_date) = ?
-                  AND strftime('%m', se.entry_date) = ?
+                WHERE {yf} AND {mf}
                 GROUP BY se.user_id
             ) v ON v.user_id = u.id
             WHERE u.id IN ({ph_list})
@@ -388,13 +389,16 @@ def get_ranking_by_tienda(determinante: str, year: int = 0, month: int = 0) -> l
     Incluye conteo de pedidos del mes para mostrar en ranking.
     """
     from datetime import date as _date
+    from database import _year_filter, _month_filter
     if not year:  year  = _date.today().year
     if not month: month = _date.today().month
     month_str = f"{month:02d}"
+    yf = _year_filter("se.entry_date")
+    mf = _month_filter("se.entry_date")
 
     with get_conn() as conn:
         cur = _exec(conn,
-            """
+            f"""
             SELECT p.id, p.pet_name, p.animal_type, p.stage, p.xp, p.coins,
                    p.hunger, p.happiness,
                    u.name AS owner_name, u.tienda, u.id AS user_id,
@@ -407,8 +411,7 @@ def get_ranking_by_tienda(determinante: str, year: int = 0, month: int = 0) -> l
                        COUNT(*)       AS total_pedidos,
                        SUM(se.units_sold) AS total_unidades
                 FROM sales_entries se
-                WHERE strftime('%Y', se.entry_date) = ?
-                  AND strftime('%m', se.entry_date) = ?
+                WHERE {yf} AND {mf}
                 GROUP BY se.user_id
             ) v ON v.user_id = u.id
             WHERE u.determinante = ?
