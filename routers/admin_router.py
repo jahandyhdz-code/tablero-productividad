@@ -256,7 +256,31 @@ async def create_user(
     return RedirectResponse("/admin?msg=Usuario+admin+creado+correctamente", status_code=302)
 
 
-@router.post("/team-target", response_class=HTMLResponse)
+@router.post("/users/{user_id}/update", response_class=HTMLResponse)
+async def update_user(
+    request: Request,
+    user_id: int,
+    determinante: str = Form(default=""),
+    squad: str = Form(default=""),
+    distrito: str = Form(default=""),
+):
+    admin = _admin_user(request)
+    if not admin:
+        return RedirectResponse("/login", status_code=302)
+    from tiendas_catalogo import TIENDAS_BY_DET
+    det = determinante.strip()
+    if det:
+        tienda_nombre = TIENDAS_BY_DET.get(det, "")
+        if tienda_nombre:
+            ph = "%s" if db._USE_PG else "?"
+            with db.get_conn() as conn:
+                db._exec(conn,
+                    f"UPDATE users SET tienda={ph}, determinante={ph} WHERE id={ph}",
+                    (tienda_nombre, det, user_id))
+    db.update_user_squad_distrito(user_id, squad, distrito)
+    return RedirectResponse("/admin?msg=Usuario+actualizado", status_code=302)
+
+
 async def set_team_target(
     request: Request,
     year: int = Form(...),
