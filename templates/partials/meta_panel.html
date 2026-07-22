@@ -1,11 +1,29 @@
-<!-- partials/meta_panel.html — Presupuesto mensual + plantilla -->
+<!-- partials/meta_panel.html — Presupuesto precargado + plantilla -->
 <div id="meta-panel" class="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
   <h3 class="font-bold text-gray-700 mb-1 text-sm uppercase tracking-wide">
     Presupuesto mensual
   </h3>
   <p class="text-xs text-gray-400 mb-4">
-    Presupuesto de tienda / plantilla = tu meta individual
+    Presupuesto de tienda / plantilla autorizada = tu meta individual
   </p>
+
+  <!-- Presupuesto tienda: SOLO LECTURA, viene de la base nacional -->
+  <div class="mb-4 rounded-xl border border-gray-100 bg-gray-50 px-4 py-3">
+    <p class="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">
+      Presupuesto de tienda (cargado por admin)
+    </p>
+    {% if presupuesto_tienda and presupuesto_tienda > 0 %}
+    <p class="text-xl font-black text-gray-800">
+      ${{ "{:,.0f}".format(presupuesto_tienda) }}
+      <span class="text-xs font-normal text-gray-400">MXN</span>
+    </p>
+    {% else %}
+    <p class="text-sm text-gray-400 italic">
+      Sin presupuesto cargado para este mes.
+      Contacta a tu administrador.
+    </p>
+    {% endif %}
+  </div>
 
   <form
     hx-post="/meta"
@@ -16,27 +34,10 @@
     <input type="hidden" name="year"  value="{{ year }}" />
     <input type="hidden" name="month" value="{{ month }}" />
 
-    <!-- Presupuesto mensual -->
+    <!-- Solo se captura la plantilla -->
     <div>
       <label class="text-xs font-semibold text-gray-600 block mb-1">
-        Presupuesto de tienda (MXN)
-      </label>
-      <div class="relative">
-        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
-        <input
-          type="number" name="meta_tienda" min="0" step="1"
-          value="{{ meta.meta_tienda | int if meta else '' }}"
-          placeholder="Ej. 500000"
-          required
-          class="w-full border border-gray-300 rounded-xl pl-7 pr-3 py-2 text-sm
-                 focus:ring-2 focus:ring-walmart focus:outline-none" />
-      </div>
-    </div>
-
-    <!-- Plantilla -->
-    <div>
-      <label class="text-xs font-semibold text-gray-600 block mb-1">
-        Plantilla autorizada (num. asesores)
+        Plantilla autorizada <span class="text-gray-400 font-normal">(num. asesores)</span>
       </label>
       <input
         type="number" name="plantilla" min="1" step="1"
@@ -48,7 +49,7 @@
     </div>
 
     <!-- Meta individual calculada -->
-    {% if meta and meta.plantilla and meta.plantilla > 0 %}
+    {% if individual and individual > 0 %}
     <div class="bg-walmart/5 border border-walmart/20 rounded-xl px-4 py-3">
       <p class="text-xs font-semibold text-gray-500 mb-1">Tu meta individual</p>
       <p class="text-2xl font-black text-walmart">
@@ -56,15 +57,21 @@
         <span class="text-sm font-normal text-gray-400">MXN</span>
       </p>
       <p class="text-[10px] text-gray-400 mt-1">
-        ${{ "{:,.0f}".format(meta.meta_tienda) }} / {{ meta.plantilla }} asesores
+        ${{ "{:,.0f}".format(presupuesto_tienda) }} / {{ meta.plantilla }} asesores
       </p>
     </div>
     {% endif %}
 
+    {% if presupuesto_tienda and presupuesto_tienda > 0 %}
     <button type="submit"
       class="w-full bg-walmart hover:bg-walmart-dark text-white font-bold
              py-2.5 rounded-xl transition text-sm shadow-sm">
-      Guardar presupuesto
+      Guardar plantilla
     </button>
+    {% else %}
+    <p class="text-xs text-gray-400 italic text-center pt-1">
+      Disponible cuando el admin cargue el presupuesto del mes.
+    </p>
+    {% endif %}
   </form>
 </div>
