@@ -59,20 +59,54 @@
       </div>
 
       <div>
-        <label for="tienda" class="block text-sm font-semibold text-gray-700 mb-1">
+        <label for="det-input" class="block text-sm font-semibold text-gray-700 mb-1">
           Tienda
         </label>
-        <select
-          id="tienda"
-          name="tienda"
+        <input
+          id="det-input"
+          name="determinante"
+          type="text"
           required
-          class="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-walmart focus:border-transparent transition bg-white"
-        >
-          <option value="" disabled {% if not form.tienda %}selected{% endif %}>Selecciona tu tienda…</option>
-          {% for t in tiendas %}
-          <option value="{{ t }}" {% if form.tienda == t %}selected{% endif %}>{{ t }}</option>
+          list="tiendas-datalist"
+          placeholder="Escribe el determinante o nombre de tu tienda..."
+          value="{{ form.determinante or '' }}"
+          autocomplete="off"
+          class="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm
+                 focus:outline-none focus:ring-2 focus:ring-walmart focus:border-transparent
+                 transition bg-white"
+        />
+        <datalist id="tiendas-datalist">
+          {% for det, nombre in catalogo_tiendas %}
+          <option value="{{ det }}">{{ nombre }}</option>
           {% endfor %}
-        </select>
+        </datalist>
+        <p class="text-xs text-gray-400 mt-1">Escribe el numero de determinante o el nombre de la tienda</p>
+      </div>
+
+      <!-- Squad y Distrito -->
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 mb-1">Squad</label>
+          <select name="squad"
+                  class="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm
+                         focus:outline-none focus:ring-2 focus:ring-walmart bg-white">
+            <option value="">-- Sin squad --</option>
+            {% for s in squads %}
+            <option value="{{ s }}" {% if form.squad == s %}selected{% endif %}>{{ s }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 mb-1">Distrito</label>
+          <select name="distrito"
+                  class="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm
+                         focus:outline-none focus:ring-2 focus:ring-walmart bg-white">
+            <option value="">-- Sin distrito --</option>
+            {% for d in distritos %}
+            <option value="{{ d }}" {% if form.distrito == d %}selected{% endif %}>Distrito {{ d }}</option>
+            {% endfor %}
+          </select>
+        </div>
       </div>
 
       <div>
