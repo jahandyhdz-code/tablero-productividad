@@ -7,7 +7,7 @@ import socket
 import tempfile
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 
@@ -32,6 +32,12 @@ app.include_router(auth_router.router)
 app.include_router(sales_router.router)
 app.include_router(admin_router.router)
 app.include_router(pet_router.router)
+
+
+@app.get("/ping", response_class=PlainTextResponse, include_in_schema=False)
+async def ping():
+    """Endpoint liviano para UptimeRobot — mantiene el servidor despierto."""
+    return "pong"
 
 
 def _local_ip() -> str:
