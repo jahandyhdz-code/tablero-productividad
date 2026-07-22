@@ -51,6 +51,194 @@
 </div>
 {% endif %}
 
+<!-- RANKING TOP 3: ASESORES + MASCOTAS -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+
+  <!-- TOP 3 ASESORES -->
+  <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+    <div class="px-5 py-3 border-b border-gray-100 flex items-center gap-2">
+      <span class="text-base">*</span>
+      <div>
+        <h3 class="font-bold text-gray-700 text-sm uppercase tracking-wide">Top 3 Asesores</h3>
+        <p class="text-[10px] text-gray-400">{{ months_es[month-1] }} {{ year }} &mdash; pedidos / dia laborado</p>
+      </div>
+    </div>
+    {% if top3_asesores %}
+    <div class="divide-y divide-gray-50">
+      {% set medals = ["1ro", "2do", "3ro"] %}
+      {% set colors = ["text-spark-dark", "text-gray-400", "text-orange-400"] %}
+      {% set bgs    = ["bg-spark/5", "", ""] %}
+      {% for m in top3_asesores %}
+      <div class="flex items-center gap-3 px-5 py-3 {{ bgs[loop.index0] }}">
+        <span class="font-black text-sm w-8 {{ colors[loop.index0] }}">{{ medals[loop.index0] }}</span>
+        <div class="flex-1 min-w-0">
+          <p class="font-bold text-gray-800 text-sm truncate">{{ m.name }}</p>
+          <p class="text-[10px] text-gray-400 truncate">{{ m.tienda or "Sin tienda" }}</p>
+        </div>
+        <div class="text-right shrink-0">
+          <p class="font-black text-lg {{ colors[loop.index0] }}">{{ m.prod_mensual }}</p>
+          <p class="text-[9px] text-gray-400">ped/dia</p>
+        </div>
+        <div class="text-right shrink-0 w-16">
+          <p class="font-semibold text-gray-700 text-sm">{{ m.monthly_actual | int }}</p>
+          <p class="text-[9px] text-gray-400">total mes</p>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-sm text-gray-400 italic text-center py-8">Sin capturas este mes.</p>
+    {% endif %}
+  </div>
+
+  <!-- TOP 3 MASCOTAS -->
+  <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+    <div class="px-5 py-3 border-b border-gray-100 flex items-center gap-2">
+      <span class="text-base">*</span>
+      <div>
+        <h3 class="font-bold text-gray-700 text-sm uppercase tracking-wide">Top 3 Mascotas</h3>
+        <p class="text-[10px] text-gray-400">{{ months_es[month-1] }} {{ year }} &mdash; por pedidos del asesor</p>
+      </div>
+    </div>
+    {% if top3_mascotas %}
+    <div class="divide-y divide-gray-50">
+      {% set medals = ["1ro", "2do", "3ro"] %}
+      {% set colors = ["text-spark-dark", "text-gray-400", "text-orange-400"] %}
+      {% set bgs    = ["bg-spark/5", "", ""] %}
+      {% for r in top3_mascotas %}
+      <div class="flex items-center gap-3 px-5 py-3 {{ bgs[loop.index0] }}">
+        <span class="font-black text-sm w-8 {{ colors[loop.index0] }}">{{ medals[loop.index0] }}</span>
+        <div style="width:36px;flex-shrink:0;">{{ r.pet_svg | safe }}</div>
+        <div class="flex-1 min-w-0">
+          <p class="font-bold text-gray-800 text-sm truncate">{{ r.pet_name }}</p>
+          <p class="text-[10px] text-gray-400 truncate">{{ r.owner_name }}</p>
+          <p class="text-[10px] text-gray-400 truncate italic">{{ r.tienda or '—' }}</p>
+          <span class="text-[9px] font-bold capitalize
+            {% if r.stage == 'adulto' %}text-walmart
+            {% elif r.stage == 'joven' %}text-blue-500
+            {% elif r.stage == 'bebe' %}text-purple-500
+            {% else %}text-gray-400{% endif %}">
+            {{ r.stage }}
+          </span>
+        </div>
+        <div class="text-right shrink-0">
+          <p class="font-black text-lg {{ colors[loop.index0] }}">{{ r.total_pedidos }}</p>
+          <p class="text-[9px] text-gray-400">pedidos</p>
+        </div>
+        <div class="text-right shrink-0 w-14">
+          <p class="font-semibold text-gray-700 text-sm">{{ r.xp }}</p>
+          <p class="text-[9px] text-gray-400">XP</p>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-sm text-gray-400 italic text-center py-8">Sin mascotas en el equipo.</p>
+    {% endif %}
+  </div>
+
+</div>
+
+<!-- PANELES SQUAD Y DISTRITO -->
+{% macro stat_table(rows, label_header) %}
+{% if rows %}
+<div class="overflow-x-auto">
+  <table class="w-full text-sm text-left">
+    <thead class="text-xs font-semibold text-gray-500 uppercase tracking-wide bg-gray-50">
+      <tr>
+        <th class="px-4 py-2">{{ label_header }}</th>
+        <th class="px-4 py-2 text-right">Asesores</th>
+        <th class="px-4 py-2 text-right">Pedidos</th>
+        <th class="px-4 py-2 text-right">Presupuesto</th>
+        <th class="px-4 py-2 text-right">Alcance</th>
+        <th class="px-4 py-2 w-32"></th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-gray-50">
+      {% for r in rows %}
+      <tr class="hover:bg-gray-50">
+        <td class="px-4 py-2.5 font-bold text-gray-800">{{ r.grupo }}</td>
+        <td class="px-4 py-2.5 text-right text-gray-600">{{ r.num_asesores }}</td>
+        <td class="px-4 py-2.5 text-right font-semibold text-gray-800">{{ r.total_pedidos }}</td>
+        <td class="px-4 py-2.5 text-right text-gray-600">
+          {% if r.presupuesto_total > 0 %}
+          ${{ "{:,.0f}".format(r.presupuesto_total) }}
+          {% else %}<span class="text-gray-300">Sin meta</span>{% endif %}
+        </td>
+        <td class="px-4 py-2.5 text-right font-bold
+          {% if r.alcance_pct is none %}text-gray-300
+          {% elif r.alcance_pct >= 100 %}text-walmart
+          {% elif r.alcance_pct >= 70 %}text-yellow-600
+          {% else %}text-wmerror{% endif %}">
+          {% if r.alcance_pct is not none %}{{ r.alcance_pct }}%
+          {% else %}&mdash;{% endif %}
+        </td>
+        <td class="px-4 py-2.5">
+          {% if r.alcance_pct is not none %}
+          <div class="w-full bg-gray-100 rounded-full h-2">
+            <div class="h-2 rounded-full
+              {% if r.alcance_pct >= 100 %}bg-walmart
+              {% elif r.alcance_pct >= 70 %}bg-yellow-400
+              {% else %}bg-red-400{% endif %}"
+              style="width: {{ [r.alcance_pct, 100] | min }}%">
+            </div>
+          </div>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<p class="text-sm text-gray-400 italic px-4 py-6 text-center">
+  Sin datos. Asigna squad/distrito a los asesores al crearlos.
+</p>
+{% endif %}
+{% endmacro %}
+
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+  <!-- Por SQUAD -->
+  <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+    <div class="px-5 py-4 border-b border-gray-100">
+      <h3 class="font-bold text-gray-700 text-sm uppercase tracking-wide">Por Squad</h3>
+      <p class="text-xs text-gray-400 mt-0.5">{{ months_es[month-1] }} {{ year }}</p>
+    </div>
+    {{ stat_table(squad_stats, "Squad") }}
+  </div>
+  <!-- Por DISTRITO -->
+  <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+    <div class="px-5 py-4 border-b border-gray-100">
+      <h3 class="font-bold text-gray-700 text-sm uppercase tracking-wide">Por Distrito</h3>
+      <p class="text-xs text-gray-400 mt-0.5">{{ months_es[month-1] }} {{ year }}</p>
+    </div>
+    {{ stat_table(distrito_stats, "Distrito") }}
+  </div>
+</div>
+
+<!-- PRESUPUESTOS POR TIENDA -- solo admin principal -->
+{% if is_super_admin %}
+<a href="/admin/presupuestos?year={{ year }}&month={{ month }}"
+   class="flex items-center justify-between bg-white rounded-2xl shadow-sm
+          border border-gray-100 px-5 py-4 mb-6 hover:shadow-md transition group">
+  <div>
+    <h3 class="font-bold text-gray-700 text-sm uppercase tracking-wide">
+      Presupuestos por Tienda
+    </h3>
+    <p class="text-xs text-gray-400 mt-0.5">
+      {% if store_budgets %}
+        {{ store_budgets | length }} tienda(s) cargadas para {{ months_es[month-1] }} {{ year }}
+      {% else %}
+        Sin presupuestos para {{ months_es[month-1] }} {{ year }}
+      {% endif %}
+    </p>
+  </div>
+  <span class="text-walmart font-bold text-sm group-hover:underline">
+    Gestionar &rarr;
+  </span>
+</a>
+{% endif %}
+
 <!-- TEAM PRODUCTIVITY TABLE -->
 <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden mb-6">
   <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
@@ -221,46 +409,32 @@
 </div>
 {% endif %}
 
-<!-- MANAGEMENT FORMS — 3 columns -->
-<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+<!-- MANAGEMENT FORMS -->
+<div class="grid grid-cols-1 md:grid-cols-{% if is_super_admin %}3{% else %}2{% endif %} gap-6">
 
-  <!-- Meta de EQUIPO (un valor para todos) -->
+  <!-- Presupuesto total del equipo (automatico desde store_budgets) -->
   <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
-    <h3 class="font-bold text-gray-700 mb-1 text-sm uppercase tracking-wide">Meta mensual del equipo</h3>
-    <p class="text-xs text-gray-400 mb-4">Se la misma meta a todos los asociados del equipo.</p>
-    <form action="/admin/team-target" method="post" class="space-y-3">
-      <div class="grid grid-cols-2 gap-2">
-        <div>
-          <label class="text-xs font-semibold text-gray-600 block mb-1">Mes</label>
-          <select name="month" class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-walmart focus:outline-none">
-            {% for i in range(1, 13) %}
-            <option value="{{ i }}" {% if i == month %}selected{% endif %}>{{ months_es[i-1] }}</option>
-            {% endfor %}
-          </select>
-        </div>
-        <div>
-          <label class="text-xs font-semibold text-gray-600 block mb-1">Año</label>
-          <select name="year" class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-walmart focus:outline-none">
-            {% for y in range(2024, 2028) %}
-            <option value="{{ y }}" {% if y == year %}selected{% endif %}>{{ y }}</option>
-            {% endfor %}
-          </select>
-        </div>
-      </div>
-      <div>
-        <label class="text-xs font-semibold text-gray-600 block mb-1">Unidades meta (por asociado)</label>
-        <input type="number" name="target_units" min="1" step="1" required placeholder="Ej. 500"
-          class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-walmart focus:outline-none" />
-      </div>
-      <button type="submit" class="w-full bg-walmart hover:bg-walmart-dark text-white font-bold py-2.5 rounded-xl transition text-sm">
-        Aplicar a todo el equipo
-      </button>
-    </form>
+    <h3 class="font-bold text-gray-700 mb-1 text-sm uppercase tracking-wide">Presupuesto del equipo</h3>
+    <p class="text-xs text-gray-400 mb-4">Suma de presupuestos de todas las tiendas asignadas &mdash; {{ months_es[month-1] }} {{ year }}</p>
+    {% if presupuesto_total > 0 %}
+    <p class="text-3xl font-black text-walmart">
+      ${{ "{:,.0f}".format(presupuesto_total) }}
+      <span class="text-sm font-normal text-gray-400">MXN</span>
+    </p>
+    <p class="text-xs text-gray-400 mt-2">{{ store_budgets | length }} tienda(s) con presupuesto cargado</p>
+    {% else %}
+    <p class="text-sm text-gray-400 italic">Sin presupuesto cargado para este periodo.</p>
+    {% if is_super_admin %}
+    <a href="/admin/presupuestos" class="text-xs text-walmart hover:underline mt-2 block">Cargar presupuesto &rarr;</a>
+    {% endif %}
+    {% endif %}
   </div>
 
-  <!-- Crear usuario -->
+  {% if is_super_admin %}
+  <!-- Crear usuario admin -->
   <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
-    <h3 class="font-bold text-gray-700 mb-4 text-sm uppercase tracking-wide">Agregar usuario</h3>
+    <h3 class="font-bold text-gray-700 mb-1 text-sm uppercase tracking-wide">Agregar usuario</h3>
+    <p class="text-xs text-gray-400 mb-4">Solo para cuentas de administracion.</p>
     <form action="/admin/users" method="post" class="space-y-3">
       <div>
         <label class="text-xs font-semibold text-gray-600 block mb-1">No. Asociado</label>
@@ -277,23 +451,29 @@
         <input type="password" name="password" required placeholder="Min. 6 caracteres"
           class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-walmart focus:outline-none" />
       </div>
+
+      <!-- Tipo de admin -->
       <div>
-        <label class="text-xs font-semibold text-gray-600 block mb-1">Rol</label>
+        <label class="text-xs font-semibold text-gray-600 block mb-1">Tipo de admin</label>
         <select name="role" id="role-select"
-          class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-walmart focus:outline-none"
+          class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm
+                 focus:ring-2 focus:ring-walmart focus:outline-none"
           onchange="toggleAdminTiendas(this.value)">
-          <option value="user">Usuario</option>
-          <option value="admin">Administrador</option>
+          <option value="admin_principal">Admin Principal (acceso total)</option>
+          <option value="admin_secundario">Admin Secundario (tiendas especificas)</option>
         </select>
+        <p class="text-[10px] text-gray-400 mt-1">
+          Principal: ve todo igual que el usuario base &bull;
+          Secundario: solo ve las tiendas que le asignes
+        </p>
       </div>
 
-      <!-- Panel de tiendas: solo visible cuando rol = admin -->
+      <!-- Panel de tiendas: solo visible cuando es admin secundario -->
       <div id="admin-tiendas-panel" class="hidden">
         <label class="text-xs font-semibold text-gray-600 block mb-1">
-          Tiendas visibles para este admin
-          <span class="text-gray-400 font-normal">(selecciona una o más)</span>
+          Tiendas asignadas
+          <span class="text-gray-400 font-normal">(selecciona una o mas)</span>
         </label>
-        <!-- Buscador -->
         <input
           type="text"
           id="tienda-search"
@@ -302,7 +482,6 @@
           class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm mb-2
                  focus:ring-2 focus:ring-walmart focus:outline-none"
         />
-        <!-- Lista de checkboxes -->
         <div id="tienda-list"
              class="border border-gray-200 rounded-xl overflow-y-auto max-h-52 bg-gray-50 px-2 py-1">
           {% for t in todas_las_tiendas %}
@@ -325,12 +504,12 @@
         </div>
       </div>
 
-      <p class="text-xs text-gray-400 italic">El asociado deberá cambiar su contraseña en el primer ingreso.</p>
       <button type="submit" class="w-full bg-walmart hover:bg-walmart-dark text-white font-bold py-2.5 rounded-xl transition text-sm">
         Crear usuario
       </button>
     </form>
   </div>
+  {% endif %}
 
   <!-- Reset password -->
   <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
@@ -374,12 +553,12 @@ function toggleDias(memberId, btn) {
 
 function toggleAdminTiendas(role) {
   const panel = document.getElementById('admin-tiendas-panel');
-  if (role === 'admin') {
+  if (role === 'admin_secundario') {
     panel.classList.remove('hidden');
     actualizarConteo();
   } else {
     panel.classList.add('hidden');
-    // Des-seleccionar todo al cambiar a usuario
+    // Des-seleccionar todo al cambiar a principal
     document.querySelectorAll('#tienda-list input[type=checkbox]')
             .forEach(cb => cb.checked = false);
     actualizarConteo();
@@ -391,6 +570,16 @@ function filtrarTiendas(q) {
   const term = q.toLowerCase().trim();
   document.querySelectorAll('#tienda-list .tienda-item').forEach(item => {
     item.style.display = item.dataset.name.includes(term) ? '' : 'none';
+  });
+}
+
+// ── Buscador de tienda en crear-usuario ──────────────────────────────────────
+function filtrarTiendaAdmin(q) {
+  const term = q.toLowerCase().trim();
+  const sel  = document.getElementById('tienda-select-admin');
+  if (!sel) return;
+  Array.from(sel.options).forEach(opt => {
+    opt.hidden = term ? !opt.text.toLowerCase().includes(term) : false;
   });
 }
 
