@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+{% block title %}Presupuestos por Tienda{% endblock %}
+
+{% block content %}
+<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+  <div>
+    <h2 class="text-xl font-bold text-gray-800">Presupuestos por Tienda</h2>
+    <p class="text-sm text-gray-500">Carga masiva de presupuesto mensual y diario por determinante</p>
+  </div>
+  <div class="flex items-center gap-2 flex-wrap">
+    <!-- Selector de periodo -->
+    <form method="get" action="/admin/presupuestos" class="flex items-center gap-2">
+      <select name="month" class="text-sm border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-walmart">
+        {% for i in range(1, 13) %}
+        <option value="{{ i }}" {% if i == month %}selected{% endif %}>{{ months_es[i-1] }}</option>
+        {% endfor %}
+      </select>
+      <select name="year" class="text-sm border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-walmart">
+        {% for y in range(2024, 2030) %}
+        <option value="{{ y }}" {% if y == year %}selected{% endif %}>{{ y }}</option>
+        {% endfor %}
+      </select>
+      <button type="submit"
+              class="bg-walmart text-white text-sm px-4 py-2 rounded-lg hover:bg-walmart-dark transition">
+        Ver
+      </button>
+    </form>
+    <!-- Descargar plantilla -->
+    <a href="/admin/presupuesto/plantilla?year={{ year }}&month={{ month }}"
+       class="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white
+              text-sm font-semibold px-4 py-2 rounded-lg transition">
+      Descargar plantilla
+    </a>
+    <!-- Volver al admin -->
+    <a href="/admin"
+       class="text-sm text-gray-500 hover:text-gray-700 px-3 py-2 rounded-lg
+              border border-gray-200 hover:bg-gray-50 transition">
+      Volver al admin
+    </a>
+  </div>
+</div>
+
+<!-- Alertas -->
+{% if msg %}
+<div class="bg-wmgreen/10 border border-wmgreen/30 text-wmgreen rounded-lg px-4 py-3 text-sm mb-5">
+  {{ msg }}
+</div>
+{% endif %}
+{% if error %}
+<div class="bg-wmerror/10 border border-wmerror/30 text-wmerror rounded-lg px-4 py-3 text-sm mb-5">
+  {{ error }}
+</div>
+{% endif %}
+
+<!-- SUBIR EXCEL -->
+<div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 mb-6">
+  <h3 class="font-bold text-gray-700 text-sm uppercase tracking-wide mb-1">Cargar Excel</h3>
+  <p class="text-xs text-gray-400 mb-4">
+    Formato: <strong>Determinante</strong> &bull;
+    <strong>Tienda</strong> &bull;
+    <strong>Presupuesto_Mensual_Omnicanal</strong> &bull;
+    <strong>1</strong> &bull; <strong>2</strong> &bull; ... &bull; <strong>31</strong>
+  </p>
+  <form action="/admin/presupuesto/subir" method="post" enctype="multipart/form-data"
+        class="flex flex-wrap items-center gap-3">
+    <input type="file" name="archivo" accept=".xlsx,.xls"
+           class="text-sm text-gray-600 border border-gray-200 rounded-lg px-3 py-2
+                  file:mr-3 file:py-1.5 file:px-4 file:rounded-lg file:border-0
+                  file:text-xs file:font-semibold file:bg-walmart file:text-white
+                  hover:file:bg-walmart-dark cursor-pointer" required />
+    <button type="submit"
+            class="bg-wmgreen hover:bg-green-700 text-white text-sm font-bold
+                   px-5 py-2 rounded-lg transition shrink-0">
+      Subir Excel
+    </button>
+  </form>
+</div>
+
+<!-- RESUMEN DEL PERIODO -->
+<div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden mb-6">
+  <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+    <div>
+      <h3 class="font-bold text-gray-700 text-sm uppercase tracking-wide">
+        Presupuestos cargados &mdash; {{ months_es[month-1] }} {{ year }}
+      </h3>
+      <p class="text-xs text-gray-400 mt-0.5">{{ store_budgets | length }} tiendas</p>
+    </div>
+    <!-- Buscador rapido -->
+    <input type="text" id="buscar-tienda" placeholder="Buscar..."
+           oninput="filtrarTabla(this.value)"
+           class="text-sm border border-gray-200 rounded-lg px-3 py-1.5
+                  focus:ring-2 focus:ring-walmart focus:outline-none w-48" />
+  </div>
+
+  {% if store_budgets %}
+  <div class="overflow-x-auto">
+    <table class="w-full text-left text-sm" id="tabla-pres">
+      <thead class="bg-gray-50 text-xs font-semibold text-gray-500 uppercase tracking-wide">
+        <tr>
+          <th class="px-4 py-3">Det.</th>
+          <th class="px-4 py-3">Tienda</th>
+          <th class="px-4 py-3 text-right">Presupuesto Mensual</th>
+          <th class="px-4 py-3 text-right">Dias cargados</th>
+          <th class="px-4 py-3 text-right">Suma diarios</th>
+          <th class="px-4 py-3 text-right">Diferencia</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-50">
+        {% for sb in store_budgets %}
+        <tr class="hover:bg-gray-50 tienda-row"
+            data-name="{{ (sb.determinante ~ ' ' ~ sb.tienda) | lower }}">
+          <td class="px-4 py-2 font-mono text-xs text-gray-500">{{ sb.determinante }}</td>
+          <td class="px-4 py-2 font-medium text-gray-800">{{ sb.tienda or '&mdash;' }}</td>
+          <td class="px-4 py-2 text-right font-semibold text-gray-700">
+            ${{ "{:,.0f}".format(sb.presupuesto) }}
+          </td>
+          <td class="px-4 py-2 text-right text-gray-500">
+            {{ sb.dias_cargados }}
+          </td>
+          <td class="px-4 py-2 text-right text-gray-700">
+            {% if sb.suma_diarios > 0 %}
+            ${{ "{:,.0f}".format(sb.suma_diarios) }}
+            {% else %}&mdash;{% endif %}
+          </td>
+          <td class="px-4 py-2 text-right text-xs
+            {% if sb.diferencia|abs < 1 %}text-wmgreen font-semibold
+            {% elif sb.diferencia|abs < sb.presupuesto * 0.05 %}text-yellow-600
+            {% else %}text-wmerror{% endif %}">
+            {% if sb.suma_diarios > 0 %}
+              {% if sb.diferencia > 0 %}+{% endif %}${{ "{:,.0f}".format(sb.diferencia) }}
+            {% else %}&mdash;{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="px-5 py-8 text-center text-gray-400 text-sm italic">
+    Sin presupuestos cargados para {{ months_es[month-1] }} {{ year }}.
+    Descarga la plantilla, llenala y subela.
+  </div>
+  {% endif %}
+</div>
+
+<script>
+function filtrarTabla(q) {
+  const term = q.toLowerCase().trim();
+  document.querySelectorAll('#tabla-pres .tienda-row').forEach(row => {
+    row.style.display = (!term || row.dataset.name.includes(term)) ? '' : 'none';
+  });
+}
+</script>
+{% endblock %}
