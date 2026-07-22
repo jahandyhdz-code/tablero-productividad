@@ -137,40 +137,7 @@
       </div>
     </div>
 
-    <!-- Log de actividad -->
-    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-      <div class="bg-gray-50 border-b border-gray-100 px-5 py-3">
-        <p class="text-xs font-bold text-gray-500 uppercase tracking-wide">Historial reciente</p>
-      </div>
-      <div class="divide-y divide-gray-50">
-        {% for entry in log %}
-        <div class="px-5 py-2.5 flex items-center justify-between text-xs">
-          <span class="text-gray-600">
-            {% if entry.action == 'earn_coins' %}Ganaste monedas
-            {% elif entry.action == 'feed' %}Alimentaste
-            {% elif entry.action == 'cosmetic' %}Compraste accesorio
-            {% elif entry.action == 'regression' %}Retroceso
-            {% elif entry.action == 'stage_up' %}Evolucion
-            {% else %}{{ entry.action }}
-            {% endif %}
-            {% if entry.detail %} — <span class="text-gray-400">{{ entry.detail[:40] }}</span>{% endif %}
-          </span>
-          <div class="flex gap-2 text-[10px]">
-            {% if entry.coins_delta != 0 %}
-            <span class="{% if entry.coins_delta > 0 %}text-walmart{% else %}text-red-400{% endif %} font-bold">
-              {{ '+' if entry.coins_delta > 0 else '' }}{{ entry.coins_delta }} mon
-            </span>
-            {% endif %}
-            {% if entry.xp_delta and entry.xp_delta != 0 %}
-            <span class="text-blue-400 font-bold">+{{ entry.xp_delta }} XP</span>
-            {% endif %}
-          </div>
-        </div>
-        {% else %}
-        <p class="px-5 py-4 text-xs text-gray-400 text-center">Sin actividad aun. Registra ventas para ganar monedas!</p>
-        {% endfor %}
-      </div>
-    </div>
+
 
   </div>
 
