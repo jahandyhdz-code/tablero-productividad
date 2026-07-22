@@ -1,0 +1,17 @@
+import sqlite3
+conn = sqlite3.connect('ventas.db')
+c = conn.cursor()
+# Ver columnas de users
+c.execute("PRAGMA table_info(users)")
+print('COLS USERS:', [r[1] for r in c.fetchall()])
+c.execute("SELECT * FROM users LIMIT 5")
+print('USERS:', c.fetchall())
+c.execute("PRAGMA table_info(pets)")
+print('COLS PETS:', [r[1] for r in c.fetchall()])
+c.execute("SELECT * FROM pets")
+print('PETS:', c.fetchall())
+c.execute("PRAGMA table_info(sales_targets)")
+print('COLS TARGETS:', [r[1] for r in c.fetchall()])
+c.execute("SELECT * FROM sales_targets")
+print('TARGETS:', c.fetchall())
+conn.close()
