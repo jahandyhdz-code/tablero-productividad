@@ -1,6 +1,58 @@
 """pet_functions.py — Logica de mascotas Tamagotchi."""
+import random
 from datetime import datetime, timezone
 from database import get_conn, _exec, _fetchone, _fetchall, _USE_PG
+
+# ── Frases motivadoras por item ──────────────────────────────────────────────
+_FRASES = {
+    "comida_basica": [
+        "Mmmm! Energia para cerrar mas pedidos!",
+        "Que rico! Ahora a darle duro!",
+        "Gracias! Juntos llegamos a la meta!",
+        "Nom nom! Eres el mejor jefe!",
+    ],
+    "golosina": [
+        "Wow, una golosina! Te lo mereces!",
+        "Dulce como tus numeros de hoy!",
+        "Esto me da energia extra pa apoyarte!",
+        "Que delicia! Sigue asi, campeon!",
+    ],
+    "medicina": [
+        "Me siento renovado! Vamos por mas!",
+        "Cuerpo sano, pedidos al alza!",
+        "Ya me cure! A seguir rompiendo metas!",
+    ],
+    "juguete": [
+        "Wiii! Jugar me hace mas feliz!",
+        "Un break y luego a cerrar pedidos!",
+        "La felicidad da productividad!",
+    ],
+    "pelota": [
+        "Yuju! Ejercicio y despues a vender!",
+        "Catch! Atrapare todas tus metas!",
+        "Ejercicio = mente fresca = mas ventas!",
+    ],
+    "sombrero": [
+        "Fashionista y productivo, ese soy yo!",
+        "Con estilo se vende mejor!",
+    ],
+    "collar": [
+        "Muy elegante, como tus ventas!",
+        "Collar puesto, meta en la mira!",
+    ],
+    "cama":    ["Zzz... (recargando para apoyarte mañana!)"],
+    "casita":  ["Mi nuevo hogar! Aqui te espero siempre!"],
+    "default": [
+        "Gracias! Seguimos juntos!",
+        "Eres lo maximo, sigue adelante!",
+        "Con tu apoyo todo es posible!",
+    ],
+}
+
+
+def _frase_motivadora(item_type: str) -> str:
+    opciones = _FRASES.get(item_type, _FRASES["default"])
+    return random.choice(opciones)
 
 # ────────────────────────────────────────────────────────────────────────────
 #  MASCOTAS (TAMAGOTCHI)
@@ -134,9 +186,9 @@ def feed_pet(user_id: int, item_type: str) -> tuple[bool, str, dict | None]:
 
     updated = get_pet_by_user(user_id)
     if evolved:
-        msg = f"Tu mascota evoluciono a {new_stage.upper()}!"
+        msg = f"EVOLUCIONE a {new_stage.upper()}! Gracias por cuidarme!"
     else:
-        msg = f"Usaste {item['nombre']}. +{item['xp']} XP"
+        msg = _frase_motivadora(item_type)
     return True, msg, updated
 
 
@@ -198,6 +250,42 @@ def get_pet_items(pet_id: int) -> list[dict]:
         cur = _exec(conn,
                     "SELECT * FROM pet_items WHERE pet_id = ? ORDER BY purchased_at DESC",
                     (pet_id,))
+        return _fetchall(cur)
+
+
+def get_top_pets_for_team(user_ids: list[int], year: int, month: int,
+                          limit: int = 3) -> list[dict]:
+    """
+    Top N mascotas del equipo visible para un admin,
+    ordenadas por pedidos del mes (DESC) luego etapa luego XP.
+    """
+    if not user_ids:
+        return []
+    from database import _year_filter, _month_filter
+    month_str = f"{month:02d}"
+    ph_list   = ",".join(["?" if not _USE_PG else "%s"] * len(user_ids))
+    with get_conn() as conn:
+        cur = _exec(conn, f"""
+            SELECT p.id, p.pet_name, p.animal_type, p.stage, p.xp, p.coins,
+                   p.hunger, p.happiness,
+                   u.name AS owner_name, u.tienda, u.id AS user_id,
+                   COALESCE(v.total_pedidos, 0) AS total_pedidos
+            FROM pets p
+            JOIN users u ON u.id = p.user_id
+            LEFT JOIN (
+                SELECT se.user_id, COUNT(*) AS total_pedidos
+                FROM sales_entries se
+                WHERE strftime('%Y', se.entry_date) = ?
+                  AND strftime('%m', se.entry_date) = ?
+                GROUP BY se.user_id
+            ) v ON v.user_id = u.id
+            WHERE u.id IN ({ph_list})
+            ORDER BY COALESCE(v.total_pedidos,0) DESC,
+                     CASE p.stage WHEN 'adulto' THEN 4 WHEN 'joven' THEN 3
+                                  WHEN 'bebe' THEN 2 ELSE 1 END DESC,
+                     p.xp DESC
+            LIMIT ?
+        """, (str(year), month_str, *user_ids, limit))
         return _fetchall(cur)
 
 
@@ -291,21 +379,41 @@ def get_emotion_meta(emotion: str) -> dict:
 
 # ── RANKING DE MASCOTAS ────────────────────────────────────────────────────
 
-def get_ranking_by_tienda(tienda: str) -> list[dict]:
+def get_ranking_by_tienda(determinante: str, year: int = 0, month: int = 0) -> list[dict]:
     """
-    Retorna lista de mascotas de la misma tienda, ordenadas por XP desc.
-    Cada entrada incluye datos de la mascota + nombre/tienda del usuario.
+    Mascotas de la misma tienda (por determinante), ordenadas por:
+      1. Pedidos del mes (DESC)  — el mejor asesor va primero
+      2. Etapa (adulto > joven > bebe > huevo)
+      3. XP
+    Incluye conteo de pedidos del mes para mostrar en ranking.
     """
+    from datetime import date as _date
+    if not year:  year  = _date.today().year
+    if not month: month = _date.today().month
+    month_str = f"{month:02d}"
+
     with get_conn() as conn:
         cur = _exec(conn,
             """
             SELECT p.id, p.pet_name, p.animal_type, p.stage, p.xp, p.coins,
                    p.hunger, p.happiness,
-                   u.name AS owner_name, u.tienda, u.id AS user_id
+                   u.name AS owner_name, u.tienda, u.id AS user_id,
+                   COALESCE(v.total_pedidos, 0) AS total_pedidos,
+                   COALESCE(v.total_unidades, 0) AS total_unidades
             FROM pets p
             JOIN users u ON u.id = p.user_id
-            WHERE u.tienda = ?
+            LEFT JOIN (
+                SELECT se.user_id,
+                       COUNT(*)       AS total_pedidos,
+                       SUM(se.units_sold) AS total_unidades
+                FROM sales_entries se
+                WHERE strftime('%Y', se.entry_date) = ?
+                  AND strftime('%m', se.entry_date) = ?
+                GROUP BY se.user_id
+            ) v ON v.user_id = u.id
+            WHERE u.determinante = ?
             ORDER BY
+              COALESCE(v.total_pedidos, 0) DESC,
               CASE p.stage
                 WHEN 'adulto' THEN 4
                 WHEN 'joven'  THEN 3
@@ -314,6 +422,6 @@ def get_ranking_by_tienda(tienda: str) -> list[dict]:
               END DESC,
               p.xp DESC
             """,
-            (tienda,))
+            (str(year), month_str, determinante))
         return _fetchall(cur)
 
