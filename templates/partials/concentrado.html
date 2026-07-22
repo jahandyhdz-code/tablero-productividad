@@ -1,5 +1,58 @@
 <!-- partials/concentrado.html — Concentrado de ventas de la tienda -->
 
+<!-- ── DESEMPEÑO TIENDA ──────────────────────────────────────────────── -->
+{% if data.presupuesto_tienda > 0 %}
+{% set at = data.alcance_tienda_pct %}
+{% if at >= 100 %}
+  {% set at_bar = "bg-wmgreen" %}
+  {% set at_badge = "bg-wmgreen/10 text-wmgreen border-wmgreen/30" %}
+{% elif at >= 75 %}
+  {% set at_bar = "bg-amber-400" %}
+  {% set at_badge = "bg-amber-50 text-amber-700 border-amber-300" %}
+{% elif at >= 50 %}
+  {% set at_bar = "bg-orange-400" %}
+  {% set at_badge = "bg-orange-50 text-orange-700 border-orange-300" %}
+{% else %}
+  {% set at_bar = "bg-wmerror" %}
+  {% set at_badge = "bg-wmerror/10 text-wmerror border-wmerror/30" %}
+{% endif %}
+<div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 mb-6">
+  <p class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-4">Desempeño Tienda &mdash; {{ tienda }}</p>
+  <div class="grid grid-cols-2 sm:grid-cols-4 gap-6">
+
+    <!-- Presupuesto -->
+    <div>
+      <p class="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1">Presupuesto</p>
+      <p class="text-xl font-black text-gray-800">${{ "{:,.0f}".format(data.presupuesto_tienda) }}</p>
+      <p class="text-[10px] text-gray-400 mt-0.5">MXN</p>
+    </div>
+
+    <!-- Ventas acumuladas -->
+    <div>
+      <p class="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1">Ventas acumuladas</p>
+      <p class="text-xl font-black text-green-700">${{ "{:,.0f}".format(data.total_monto) }}</p>
+      <p class="text-[10px] text-gray-400 mt-0.5">{{ data.associates | length }} asesores</p>
+    </div>
+
+    <!-- Alcance barra -->
+    <div class="sm:col-span-2">
+      <div class="flex items-center justify-between mb-2">
+        <p class="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Alcance tienda</p>
+        <span class="text-xs font-black px-2 py-0.5 rounded-full border {{ at_badge }}">{{ at }}%</span>
+      </div>
+      <div class="bg-gray-100 rounded-full h-3 overflow-hidden">
+        <div class="{{ at_bar }} h-3 rounded-full transition-all duration-500"
+             style="width: {{ [at, 100]|min }}%"></div>
+      </div>
+      <p class="text-[10px] text-gray-400 mt-1">
+        ${{ "{:,.0f}".format(data.total_monto) }} de ${{ "{:,.0f}".format(data.presupuesto_tienda) }} MXN
+      </p>
+    </div>
+
+  </div>
+</div>
+{% endif %}
+
 <!-- ── Cards de totales ─────────────────────────────────────────────── -->
 <div class="grid grid-cols-2 sm:grid-cols-5 gap-4 mb-6">
 
@@ -62,7 +115,6 @@
           <th class="px-4 py-3 text-right whitespace-nowrap">Total Monto</th>
           <!-- Alcances -->
           <th class="px-4 py-3 text-center whitespace-nowrap">Meta Individual</th>
-          <th class="px-4 py-3 text-center whitespace-nowrap">Alcance Tienda</th>
         </tr>
       </thead>
       <tbody>
@@ -140,16 +192,6 @@
             {% endif %}
           </td>
 
-          <!-- Alcance Total Tienda -->
-          <td class="px-4 py-3 text-center">
-            <div class="flex flex-col items-center gap-1">
-              <div class="w-16 bg-gray-100 rounded-full h-1.5">
-                <div class="bg-walmart h-1.5 rounded-full"
-                     style="width:{{ a.pct_tienda if a.pct_tienda <= 100 else 100 }}%"></div>
-              </div>
-              <span class="text-xs text-gray-500">{{ a.pct_tienda }}%</span>
-            </div>
-          </td>
 
         </tr>
         {% endfor %}
