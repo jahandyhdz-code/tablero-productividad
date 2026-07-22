@@ -497,14 +497,16 @@ def get_all_users(tiendas_filter: list | None = None) -> list[dict]:
             ph = ",".join(["%s" if _USE_PG else "?"] * len(tiendas_filter))
             cur = _exec(
                 conn,
-                f"SELECT id,associate_number,name,role,tienda,admin_tiendas,created_at"
+                f"SELECT id,associate_number,name,role,tienda,determinante,"
+                f"squad,distrito,admin_tiendas,created_at"
                 f" FROM users WHERE tienda IN ({ph}) ORDER BY name",
                 tiendas_filter,
             )
         else:
             cur = _exec(
                 conn,
-                "SELECT id,associate_number,name,role,tienda,admin_tiendas,created_at"
+                "SELECT id,associate_number,name,role,tienda,determinante,"
+                "squad,distrito,admin_tiendas,created_at"
                 " FROM users ORDER BY name",
             )
         return _fetchall(cur)
